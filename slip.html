@@ -23,8 +23,7 @@
   </div>
   <h1>Slip Gaji AWB</h1>
   <div class="couple">PT. Agriwangi Berry</div>
-  <small id="sub">Periode: September 2026</small>
-  <div><span id="cn" class="badge">🟢 Siap Digunakan</span></div>
+  <div style="margin-top:8px"><span id="cn" class="badge">🟢 Siap Digunakan</span></div>
 </header>
 
 <div id="st"></div>
@@ -128,26 +127,38 @@ function drawPage() {
   if (currentTab === 'home') {
     let total = 0;
     workers.forEach(w => total += calc(w).total);
-    $('sub').textContent = getSetting('periode');
     
+    // Buat opsi dropdown untuk download per orang
+    const options = workers.filter(w => w.n && w.n.trim()).map(w => {
+       const idx = workers.indexOf(w);
+       return `<option value="${idx}">${esc(w.n)}</option>`;
+    }).join('');
+
     m.innerHTML = `
       <div class="grid" style="margin-bottom:12px">
-        <div class="card"><div class="mute">Total Pengeluaran</div><div class="num" style="font-size:20px;color:var(--wine)">${rp(total)}</div></div>
+        <div class="card"><div class="mute">Total Gaji Karyawan</div><div class="num" style="font-size:20px;color:var(--wine)">${rp(total)}</div></div>
         <div class="card"><div class="mute">Jumlah Pekerja</div><div class="num" style="font-size:20px">${workers.length} orang</div></div>
       </div>
       <div class="card">
         <div class="row"><b>Generator PDF</b></div>
-        <p class="mute" style="margin:10px 0">Simpan slip secara massal (satu per pekerja) atau cetak secara langsung.</p>
-        <div class="grid">
-          <button class="p big" style="grid-column:1/3; background:var(--wine); color:#fff; border:0; border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="saveAllPDF()">📥 Download Semua PDF</button>
-          <button style="grid-column:1/3; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="window.print()">🖨️ Cetak Semua (Print)</button>
-        </div>
+        <p class="mute" style="margin:10px 0">Pilih nama untuk download satu per satu, atau download semua sekaligus.</p>
+        
+        <label class="mute" style="font-size:12px; margin-bottom:4px; display:block;">Pilih Karyawan:</label>
+        <select id="pdf-select" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid var(--line); background:#fff; font-family:inherit;">
+          <option value="">-- Pilih Nama --</option>
+          ${options}
+        </select>
+        <button style="width:100%; background:var(--wine); color:#fff; border:0; border-radius:10px; padding:12px; font:600 15px Figtree,sans-serif; margin-bottom:10px;" onclick="downloadSelectedPDF()">📥 Download PDF Terpilih</button>
+        
+        <hr style="border:0; border-top:1px dashed var(--line); margin:16px 0;">
+        
+        <button style="width:100%; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif; margin-bottom:10px;" onclick="saveAllPDF()">📥 Download Semua PDF</button>
+        <button style="width:100%; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="window.print()">🖨️ Cetak Semua (Print)</button>
       </div>
-      <div class="mute" style="text-align:center;margin-top:14px">Versi PWA v1.1</div>
+      <div class="mute" style="text-align:center;margin-top:14px">Versi PWA v1.2</div>
     `;
   } 
   else if (currentTab === 'data') {
-    $('sub').textContent = workers.length + ' Pekerja';
     let html = `<button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja</button>`;
     
     workers.forEach((w, idx) => {
@@ -179,7 +190,10 @@ function drawPage() {
           </details>
           <div class="row" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:8px">
             <span class="mute">Total Diterima</span>
-            <strong style="color:var(--wine)">${rp(c.total)}</strong>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <strong style="color:var(--wine)">${rp(c.total)}</strong>
+              <button onclick="saveSlipPDF(workers[${idx}])" style="border:1px solid var(--wine); background:none; color:var(--wine); border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; font-weight:600;">📥 PDF</button>
+            </div>
           </div>
         </div>
       `;
@@ -288,12 +302,13 @@ function slipHTML(w) {
 }
 
 async function saveSlipPDF(w) {
+  if (!w.n || !w.n.trim()) return alert('Nama pekerja kosong.');
   if (typeof html2pdf === 'undefined') return alert('Library PDF belum siap.');
   const host = $('pdfRenderHost');
   host.innerHTML = slipHTML(w);
   
   const el = host.querySelector('.slip');
-  const safeName = String(w.n || 'Pekerja').replace(/[\\/:*?"<>|]+/g, '');
+  const safeName = String(w.n).replace(/[\\/:*?"<>|]+/g, '');
   
   try {
     await html2pdf().set({
@@ -307,6 +322,13 @@ async function saveSlipPDF(w) {
     console.error(err);
   }
   host.innerHTML = '';
+}
+
+function downloadSelectedPDF() {
+  const sel = document.getElementById('pdf-select');
+  if (!sel || !sel.value) return alert('Pilih nama karyawan terlebih dahulu.');
+  const idx = parseInt(sel.value);
+  saveSlipPDF(workers[idx]);
 }
 
 async function saveAllPDF() {
