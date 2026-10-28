@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v4'; // Naikkan versi setiap kali ada perubahan kode
+const CACHE_NAME = 'awb-apps-v5'; // Naikkan versi setiap kali ada perubahan kode
 const urlsToCache = [
   './',
   './index.html',
