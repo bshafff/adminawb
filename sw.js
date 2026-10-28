@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v2';
+const CACHE_NAME = 'awb-apps-v3';
 const urlsToCache = [
   './',
   './index.html',
