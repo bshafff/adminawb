@@ -10,7 +10,16 @@
 <title>Slip Gaji AWB</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<!-- Library untuk membaca Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Library untuk PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  #pdfRenderHost {
+    position: fixed; top: 0; left: 0; width: 100%; max-width: 600px; 
+    background: #fff; z-index: -9999; opacity: 0; pointer-events: none;
+  }
+</style>
 </head>
 <body>
 
@@ -28,9 +37,7 @@
 
 <div id="st"></div>
 
-<main id="m">
-  <!-- Konten dirender via JS -->
-</main>
+<main id="m"></main>
 
 <nav>
   <button onclick="switchTab('home')" id="nav-home" class="on"><div class="ic">🏠</div>Home</button>
@@ -38,8 +45,7 @@
   <button onclick="switchTab('setting')" id="nav-setting"><div class="ic">⚙️</div>Pengaturan</button>
 </nav>
 
-<!-- Container khusus untuk render PDF -->
-<div id="pdfRenderHost" style="position:fixed;left:-9999px;top:0;width:520px;background:#fff;"></div>
+<div id="pdfRenderHost"></div>
 
 <script>
 const COMPANY = 'PT. AGRI WANGI BERRY';
@@ -49,33 +55,7 @@ let workers = [];
 
 const DEFAULT_WORKERS = [
   {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Cecep Saepudin', i:'54401022961537', k:'Grower GH 1', h:'23', j:'8', m:'34', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Indra Rudiana', i:'54401094140507', k:'Grower GH 1', h:'25', j:'6', m:'34', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Linda', i:'54401100322500', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Muhamad Hilmy Khomaeni', i:'54401100324502', k:'Grower GH 1', h:'23', j:'6', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Nesti Nurhayati', i:'54401101358504', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Sutiawan', i:'54401101357508', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Pipit Septiani L', i:'54401085557505', k:'Grower GH 1', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Risda Alfauza Yulinar', i:'412101060929539', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Randiana Agung Januar', i:'001901279029501', k:'Grower GH 1', h:'26', j:'11', m:'34', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Dena Raditya Sutrisna', i:'001901288667508', k:'Grower GH 2', h:'25', j:'4', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Ganjar', i:'054401105836504', k:'Grower GH 2', h:'25', j:'8', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Ilham Jaelani', i:'326901039204505', k:'Grower GH 2', h:'25', j:'6', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Rendi Saeful Nazar', i:'412101026325503', k:'Grower GH 2', h:'26', j:'8', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Rima Rismayanti', i:'326901039090508', k:'Grower GH 2', h:'26', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Rismaya', i:'054401105329507', k:'Grower GH 2', h:'24', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Rudi Saputra', i:'001901293679508', k:'Grower GH 2', h:'26', j:'10', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Astrin Julianti K', i:'412101039749500', k:'Processing', h:'25', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Mianti Fatma Kusmawan', i:'411801018850501', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Resa Yolandari', i:'201601034392507', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Santi Susanti', i:'001901275306503', k:'Processing', h:'25', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Tanti Agustina', i:'412101057445538', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Zahra Agesty R', i:'326901038994505', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Yendi Hermawan', i:'326901076957533', k:'Grower Fertigasi', h:'21', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
-  {n:'Rayza Pratama Aldianto', i:'412101039282508', k:'Satpam', h:'30', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Tediansyah', i:'412101059991535', k:'Satpam', h:'30', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Pajar Wiguna', i:'54401050332508', k:'Housekeeping', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Risma', i:'326901075283533', k:'Housekeeping', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''}
+  {n:'Cecep Saepudin', i:'54401022961537', k:'Grower GH 1', h:'23', j:'8', m:'34', r:'0', p:'0', a:'', b:'', c:''}
 ];
 
 const $ = id => document.getElementById(id);
@@ -85,7 +65,7 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 
 function toast(t) {
   const e = $('st'); e.textContent = t; e.style.display = 'block';
-  clearTimeout(window._tt); window._tt = setTimeout(() => e.style.display = 'none', 2000);
+  clearTimeout(window._tt); window._tt = setTimeout(() => e.style.display = 'none', 2500);
 }
 
 function getSetting(k) {
@@ -128,22 +108,20 @@ function drawPage() {
     let total = 0;
     workers.forEach(w => total += calc(w).total);
     
-    // Buat opsi dropdown untuk download per orang
     const options = workers.filter(w => w.n && w.n.trim()).map(w => {
        const idx = workers.indexOf(w);
-       return `<option value="${idx}">${esc(w.n)}</option>`;
+       return `<option value="${idx}">${esc(w.n)} (${esc(w.k)})</option>`;
     }).join('');
 
     m.innerHTML = `
       <div class="grid" style="margin-bottom:12px">
-        <div class="card"><div class="mute">Total Gaji Karyawan</div><div class="num" style="font-size:20px;color:var(--wine)">${rp(total)}</div></div>
-        <div class="card"><div class="mute">Jumlah Pekerja</div><div class="num" style="font-size:20px">${workers.length} orang</div></div>
+        <div class="card"><div class="mute">Total Gaji</div><div class="num" style="font-size:18px;color:var(--wine)">${rp(total)}</div></div>
+        <div class="card"><div class="mute">Pekerja</div><div class="num" style="font-size:18px">${workers.length} org</div></div>
       </div>
       <div class="card">
         <div class="row"><b>Generator PDF</b></div>
-        <p class="mute" style="margin:10px 0">Pilih nama untuk download satu per satu, atau download semua sekaligus.</p>
         
-        <label class="mute" style="font-size:12px; margin-bottom:4px; display:block;">Pilih Karyawan:</label>
+        <label class="mute" style="font-size:12px; margin:10px 0 4px; display:block;">Pilih Karyawan:</label>
         <select id="pdf-select" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid var(--line); background:#fff; font-family:inherit;">
           <option value="">-- Pilih Nama --</option>
           ${options}
@@ -153,18 +131,23 @@ function drawPage() {
         <hr style="border:0; border-top:1px dashed var(--line); margin:16px 0;">
         
         <button style="width:100%; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif; margin-bottom:10px;" onclick="saveAllPDF()">📥 Download Semua PDF</button>
-        <button style="width:100%; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="window.print()">🖨️ Cetak Semua (Print)</button>
       </div>
-      <div class="mute" style="text-align:center;margin-top:14px">Versi PWA v1.2</div>
     `;
   } 
   else if (currentTab === 'data') {
-    let html = `<button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja</button>`;
+    let html = `
+      <div class="card" style="background:#e8f4ea; border-color:#b8d8be; margin-bottom:14px;">
+        <b style="color:var(--sage)">Import dari Excel</b>
+        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file <i>Upah Grower & General 2026.xlsx</i> Anda. Sistem akan otomatis membaca data berdasarkan bulan/sheet yang ada di dalamnya.</p>
+        <input type="file" id="excel-input" accept=".xlsx, .xls" onchange="handleExcelUpload(event)" style="width:100%; padding:8px; background:#fff; border:1px solid #b8d8be; border-radius:8px;">
+      </div>
+      <button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja Manual</button>
+    `;
     
     workers.forEach((w, idx) => {
       const c = calc(w);
       html += `
-        <div class="card" style="padding:12px">
+        <div class="card" style="padding:12px; margin-bottom:8px;">
           <div class="row" style="margin-bottom:8px">
             <input type="text" value="${esc(w.n)}" placeholder="Nama" onchange="updateW(${idx},'n',this.value)" style="font-weight:600; border:0; border-bottom:1px dashed var(--line); padding:4px;">
             <button onclick="delWorker(${idx})" style="border:0;background:none;color:#a33;font-size:18px">🗑️</button>
@@ -210,7 +193,7 @@ function drawPage() {
     m.innerHTML = `
       <div class="card">
         <h3 style="margin:0 0 12px;font-family:Fraunces,serif;color:var(--wine)">Pengaturan Global</h3>
-        <label>Periode</label>
+        <label>Periode Cetak</label>
         <input type="text" id="set-periode" value="${periode}">
         <label style="margin-top:10px">Upah Standar / Hari (Rp)</label>
         <input type="number" id="set-thari" value="${tHari}">
@@ -225,6 +208,122 @@ function drawPage() {
   }
 }
 
+// ===== FITUR IMPORT EXCEL =====
+async function handleExcelUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      
+      // Tanya user mau baca sheet yang mana
+      const sheetList = workbook.SheetNames.join(', ');
+      const defaultSheet = workbook.SheetNames[workbook.SheetNames.length - 1];
+      const selectedSheet = prompt(`Pilih nama Sheet yang ingin di-import:\n(Tersedia: ${sheetList})`, defaultSheet);
+      
+      if (!selectedSheet || !workbook.Sheets[selectedSheet]) {
+        return toast('Sheet tidak ditemukan / dibatalkan');
+      }
+
+      const sheet = workbook.Sheets[selectedSheet];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+      
+      const newWorkers = [];
+      let currentCategory = 'Grower';
+      let colMap = null;
+
+      rows.forEach(row => {
+        // 1. Deteksi Kategori (Baris yang ada tulisan "Upah ...")
+        const colB = String(row[1] || '').trim();
+        if (colB.startsWith('Upah ')) {
+          currentCategory = colB.replace('Upah ', '').trim();
+        }
+
+        // 2. Deteksi Header Tabel (Mencari baris yang ada "Nama" dan "Kehadiran")
+        const findCol = (keyword, exclude = []) => {
+          return row.findIndex(c => {
+            const s = String(c).toUpperCase();
+            return s.includes(keyword.toUpperCase()) && !exclude.some(ex => s.includes(ex.toUpperCase()));
+          });
+        };
+
+        if (row.includes('Nama') && row.some(c => String(c).includes('Kehadiran'))) {
+          colMap = {
+            n: findCol('Nama'),
+            h: findCol('Kehadiran', ['Lembur', 'Merah', 'Piket']),
+            a: findCol('Upah/Hari'),
+            j: findCol('Lembur'),
+            r: findCol('Tanggal Merah', ['Nominal']),
+            i: findCol('Rekening')
+          };
+          return; // Lanjut ke baris berikutnya (data)
+        }
+
+        // 3. Ekstrak Data
+        if (colMap && row[colMap.n]) {
+          const name = String(row[colMap.n]).trim();
+          // Abaikan jika baris kosong atau baris Total
+          if (!name || name === 'Nama' || name.includes('Total') || name.includes('Jumlah')) return;
+
+          // Parsing Lembur (misal 8.34 -> 8 Jam 34 Menit)
+          let j = 0, m = 0;
+          const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
+          if (rawJ && !isNaN(parseFloat(rawJ))) {
+             if (rawJ.includes('.')) {
+               const parts = rawJ.split('.');
+               j = parseInt(parts[0]) || 0;
+               // Ambil 2 digit, kalau cuma 1 digit berarti puluhan (misal .5 = 50 menit)
+               m = parseInt(parts[1].length === 1 ? parts[1] + '0' : parts[1].substring(0,2)) || 0;
+             } else {
+               j = parseInt(rawJ) || 0;
+             }
+          }
+
+          const rek = colMap.i !== -1 ? String(row[colMap.i]).trim() : '';
+          const upah = colMap.a !== -1 ? String(row[colMap.a]).trim() : '';
+          const hadir = colMap.h !== -1 ? String(row[colMap.h]).trim() : '0';
+          const merah = colMap.r !== -1 ? String(row[colMap.r]).trim() : '0';
+
+          newWorkers.push({
+            n: name,
+            i: rek,
+            k: currentCategory,
+            h: hadir,
+            j: String(j),
+            m: String(m),
+            r: merah,
+            p: '0',
+            a: upah,
+            b: '', c: ''
+          });
+        }
+      });
+
+      if (newWorkers.length > 0) {
+        if (confirm(`Berhasil membaca ${newWorkers.length} pekerja dari Sheet "${selectedSheet}".\n\nGanti data saat ini dengan data baru?`)) {
+          workers = newWorkers;
+          saveToLocal();
+          drawPage();
+          toast('Data berhasil diimport!');
+        }
+      } else {
+        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel sesuai.');
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membaca file Excel. Pastikan file tidak rusak.');
+    }
+    
+    // Reset input file agar bisa upload file yang sama lagi
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function updateW(idx, key, val) {
   workers[idx][key] = val;
   saveToLocal();
@@ -232,7 +331,7 @@ function updateW(idx, key, val) {
 }
 
 function addWorker() {
-  workers.push({n:'', i:'', k:'Grower GH 1', h:'0', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''});
+  workers.push({n:'', i:'', k:'Grower', h:'0', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''});
   saveToLocal();
   drawPage();
 }
@@ -258,7 +357,7 @@ function saveSetting() {
 }
 
 function resetData() {
-  if (confirm('Kembalikan ke data awal (Excel)? Semua perubahan akan hilang.')) {
+  if (confirm('Kembalikan ke data awal? Semua perubahan akan hilang.')) {
     workers = JSON.parse(JSON.stringify(DEFAULT_WORKERS));
     saveToLocal();
     drawPage();
@@ -281,7 +380,7 @@ function slipHTML(w) {
     <div class="per">Periode : <strong>${periode}</strong></div>
     <table>
       <tr><td>Nama</td><td>: ${esc(w.n)}</td></tr>
-      <tr><td>Rekening BRI</td><td>: ${esc(w.i)}</td></tr>
+      <tr><td>Rekening BRI</td><td>: ${esc(w.i || '-')}</td></tr>
       <tr><td>Hari Kehadiran</td><td>: ${num(w.h)} Hari</td></tr>
       <tr><td>Upah per Hari</td><td>: ${rp(c.tH)}</td></tr>
       <tr><td>Total Upah Kehadiran</td><td>: ${rp(c.hadir)}</td></tr>
@@ -304,8 +403,11 @@ function slipHTML(w) {
 async function saveSlipPDF(w) {
   if (!w.n || !w.n.trim()) return alert('Nama pekerja kosong.');
   if (typeof html2pdf === 'undefined') return alert('Library PDF belum siap.');
+  
   const host = $('pdfRenderHost');
   host.innerHTML = slipHTML(w);
+  
+  await new Promise(r => setTimeout(r, 200));
   
   const el = host.querySelector('.slip');
   const safeName = String(w.n).replace(/[\\/:*?"<>|]+/g, '');
@@ -315,11 +417,16 @@ async function saveSlipPDF(w) {
       margin: 10,
       filename: `Slip Gaji - ${safeName}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas: { 
+        scale: 2, useCORS: true, backgroundColor: '#ffffff',
+        scrollX: 0, scrollY: 0, windowWidth: 600, windowHeight: el.offsetHeight + 80 
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }).from(el).save();
   } catch (err) {
     console.error(err);
+    alert('Gagal membuat PDF. Coba lagi.');
   }
   host.innerHTML = '';
 }
@@ -343,14 +450,15 @@ async function saveAllPDF() {
   for (let i = 0; i < valid.length; i++) {
     btn.textContent = `Menyimpan ${i + 1}/${valid.length}...`;
     await saveSlipPDF(valid[i]);
-    await new Promise(r => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 400));
   }
   
   btn.textContent = orig;
   btn.disabled = false;
-  alert('Selesai mengunduh PDF.');
+  alert('Selesai mengunduh semua PDF.');
 }
 
+// Init Data
 if (localStorage.getItem(STORE)) {
   workers = JSON.parse(localStorage.getItem(STORE));
 } else {
