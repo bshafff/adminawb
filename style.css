@@ -289,6 +289,13 @@ nav button .ic { font-size: 19px; line-height: 1; }
 @media print {
   body * { visibility: hidden; }
   #pdfRenderHost, #pdfRenderHost * { visibility: visible; }
-  #pdfRenderHost { position: absolute; left: 0; top: 0; width: 100%; }
+  #pdfRenderHost { 
+    position: absolute; 
+    left: 0; 
+    top: 0; 
+    width: 100%; 
+    opacity: 1 !important; 
+    z-index: 9999 !important; 
+  }
   .slip { border: none; page-break-after: always; }
 }
