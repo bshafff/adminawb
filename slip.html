@@ -134,7 +134,7 @@ function drawPage() {
     let html = `
       <div class="card" style="background:#e8f4ea; border-color:#b8d8be; margin-bottom:14px;">
         <b style="color:var(--sage)">Import dari Excel</b>
-        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file Excel Anda. Sistem akan otomatis mencari baris "Nama" & "Kehadiran" dan mengabaikan baris judul.</p>
+        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file Excel Anda. Sistem akan memvalidasi dan mengabaikan baris Total/Summary secara otomatis.</p>
         <input type="file" id="excel-input" accept=".xlsx, .xls" onchange="handleExcelUpload(event)" style="width:100%; padding:8px; background:#fff; border:1px solid #b8d8be; border-radius:8px;">
       </div>
       <button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja Manual</button>
@@ -204,7 +204,7 @@ function drawPage() {
   }
 }
 
-// ===== FITUR IMPORT EXCEL (LOGIKA BARU) =====
+// ===== FITUR IMPORT EXCEL (SUDAH DIPERBAIKI) =====
 async function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -229,67 +229,87 @@ async function handleExcelUpload(e) {
       const newWorkers = [];
       let currentCategory = 'Grower';
       let colMap = null;
+      let isSummarySection = false; // Penanda agar berhenti saat masuk tabel Summary
 
       rows.forEach(row => {
-        // 1. Cek apakah baris ini adalah Judul Kategori (misal: "Upah Grower GH 1")
         const rowStr = row.map(c => String(c).trim().toUpperCase());
         const bCell = String(row[1] || '').trim();
-        
-        if (bCell.toLowerCase().startsWith('upah ')) {
-          currentCategory = bCell.substring(5).trim();
-          return; // Lanjut ke baris berikutnya (header)
+
+        // 1. Deteksi jika masuk area Summary / Total
+        if (bCell.toUpperCase() === 'SUMMARY' || bCell.toUpperCase() === 'TOTAL') {
+           isSummarySection = true;
+           colMap = null; // Matikan pembacaan tabel saat ini
+           return;
         }
 
-        // 2. Cek apakah baris ini adalah Header Tabel
+        // 2. Deteksi Judul Kategori (Upah Grower...)
+        if (bCell.toLowerCase().startsWith('upah ')) {
+          currentCategory = bCell.substring(5).trim();
+          isSummarySection = false; // Reset flag jika ada tabel baru di bawahnya
+          colMap = null;
+          return;
+        }
+
+        // Jika sedang di area summary, abaikan semua baris di bawahnya sampai ketemu judul "Upah ..." baru
+        if (isSummarySection) return;
+
+        // 3. Deteksi Header Tabel
         const isHeader = rowStr.includes('NAMA') && rowStr.some(c => c.includes('KEHADIRAN'));
         if (isHeader) {
           colMap = {
-            n: rowStr.findIndex(c => c === 'NAMA' || c.includes('NAMA PEKERJA')),
+            n: rowStr.findIndex(c => c === 'NAMA'),
             h: rowStr.findIndex(c => c.includes('KEHADIRAN') && !c.includes('LEMBUR') && !c.includes('MERAH') && !c.includes('PIKET')),
             a: rowStr.findIndex(c => c.includes('UPAH') && (c.includes('HARI') || c.includes('SHIFT'))),
             j: rowStr.findIndex(c => c.includes('LEMBUR') && !c.includes('NOMINAL') && !c.includes('TOTAL')),
             r: rowStr.findIndex(c => c.includes('MERAH') && !c.includes('NOMINAL') && !c.includes('TOTAL')),
             i: rowStr.findIndex(c => c.includes('REKENING') || c.includes('BRI'))
           };
-          return; // Lanjut ke baris berikutnya (data)
+          return;
         }
 
-        // 3. Ekstrak Data Pekerja
+        // 4. Ekstrak Data Pekerja
         if (colMap && colMap.n !== -1) {
           const name = String(row[colMap.n] || '').trim();
           
-          // Abaikan jika kosong, atau berisi kata "Total", "Jumlah", "Nama"
-          if (!name || name.toUpperCase() === 'NAMA' || name.includes('Total') || name.includes('Jumlah') || name.includes('Summary')) return;
+          // Abaikan jika kosong, atau nama berisi kata kunci sistem
+          if (!name || name.toUpperCase() === 'NAMA' || name.toUpperCase() === 'NO' || name.toLowerCase().includes('total')) return;
+
+          // VALIDASI KETAT: Cek kolom Hadir. Jika isinya teks "Rp" atau ada koma, berarti ini bukan hari kehadiran.
+          let rawH = String(row[colMap.h] || '').trim();
+          if (rawH.includes('Rp') || rawH.includes(',')) {
+             return; // Lewati baris ini karena formatnya salah
+          }
 
           // Parsing Lembur (misal 8.34 -> 8 Jam 34 Menit)
           let j = 0, m = 0;
           if (colMap.j !== -1) {
             const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
-            if (rawJ && !isNaN(parseFloat(rawJ))) {
+            if (rawJ && !isNaN(parseFloat(rawJ)) && !rawJ.includes('Rp')) {
               if (rawJ.includes('.')) {
                 const parts = rawJ.split('.');
                 j = parseInt(parts[0]) || 0;
-                // Ambil maksimal 2 digit desimal
                 let mStr = parts[1].substring(0, 2);
                 if (mStr.length === 1) mStr += '0';
                 m = parseInt(mStr) || 0;
-                if (m >= 60) m = 0; // Jaga-jaga jika format aneh
+                if (m >= 60) m = 0;
               } else {
                 j = parseInt(rawJ) || 0;
               }
             }
           }
 
-          // Ekstrak data lainnya
+          // Ambil sisa data
           const rek = colMap.i !== -1 ? String(row[colMap.i] || '').trim() : '';
-          const hadir = colMap.h !== -1 ? String(row[colMap.h] || '').trim() : '0';
-          const merah = colMap.r !== -1 ? String(row[colMap.r] || '').trim() : '0';
+          const merah = colMap.r !== -1 ? String(row[colMap.r] || '').replace(/[^0-9]/g, '') : '0';
           
           let upah = '';
           if (colMap.a !== -1) {
             const rawUpah = String(row[colMap.a] || '').replace(/[^0-9]/g, ''); 
             if (rawUpah && rawUpah !== '0') upah = rawUpah;
           }
+
+          // Ambil angka murni dari hari kehadiran
+          const hadir = rawH.replace(/[^0-9]/g, '') || '0';
 
           newWorkers.push({
             n: name,
@@ -314,7 +334,7 @@ async function handleExcelUpload(e) {
           toast('Data berhasil diimport!');
         }
       } else {
-        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel memiliki judul "Nama" dan "Kehadiran".');
+        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel sesuai.');
       }
 
     } catch (err) {
