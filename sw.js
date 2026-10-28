@@ -1,7 +1,9 @@
-const CACHE_NAME = 'slip-gaji-v1';
+const CACHE_NAME = 'awb-apps-v2';
 const urlsToCache = [
   './',
   './index.html',
+  './slip.html',
+  './stok.html',
   './style.css',
   './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
