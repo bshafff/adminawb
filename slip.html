@@ -17,6 +17,36 @@
     position: fixed; top: 0; left: 0; width: 100%; max-width: 600px; 
     background: #fff; z-index: -9999; opacity: 0; pointer-events: none;
   }
+  /* CSS Modal Import */
+  #import-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
+    z-index: 10000; display: none; align-items: flex-end; justify-content: center;
+  }
+  .import-content {
+    background: #fff; width: 100%; max-width: 600px; max-height: 85vh;
+    border-radius: 16px 16px 0 0; display: flex; flex-direction: column;
+  }
+  .import-header {
+    padding: 16px; border-bottom: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .import-body {
+    padding: 16px; overflow-y: auto; flex: 1;
+  }
+  .import-item {
+    display: flex; align-items: center; gap: 12px; padding: 8px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .import-item input[type="checkbox"] {
+    width: 20px; height: 20px; accent-color: var(--wine);
+  }
+  .import-item-info { flex: 1; }
+  .import-item-info b { display: block; font-size: 14px; }
+  .import-item-info small { color: var(--mute); font-size: 12px; }
+  .import-footer {
+    padding: 16px; border-top: 1px solid var(--line);
+    display: flex; gap: 10px;
+  }
 </style>
 </head>
 <body>
@@ -42,6 +72,23 @@
   <button onclick="switchTab('setting')" id="nav-setting"><div class="ic">⚙️</div>Pengaturan</button>
 </nav>
 
+<!-- Modal untuk memilih nama yang mau di-import -->
+<div id="import-modal">
+  <div class="import-content">
+    <div class="import-header">
+      <b>Pilih Pekerja yang Di-import</b>
+      <button onclick="document.getElementById('import-modal').style.display='none'" style="background:none; border:0; font-size:24px; cursor:pointer;">&times;</button>
+    </div>
+    <div class="import-body" id="import-list">
+      <!-- Checkbox dirender via JS -->
+    </div>
+    <div class="import-footer">
+      <button onclick="document.getElementById('import-modal').style.display='none'" style="flex:1; padding:12px; border:1px solid var(--line); background:#eee; border-radius:10px; font-weight:600;">Batal</button>
+      <button onclick="confirmImport()" style="flex:2; padding:12px; border:0; background:var(--wine); color:#fff; border-radius:10px; font-weight:600;">Import Terpilih</button>
+    </div>
+  </div>
+</div>
+
 <div id="pdfRenderHost"></div>
 
 <script>
@@ -49,6 +96,7 @@ const COMPANY = 'PT. AGRI WANGI BERRY';
 const STORE = 'slip-upah-pwa-v1';
 let currentTab = 'home';
 let workers = [];
+let parsedWorkers = []; // Menyimpan hasil sementara sebelum di-import
 
 const DEFAULT_WORKERS = [
   {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''}
@@ -134,7 +182,7 @@ function drawPage() {
     let html = `
       <div class="card" style="background:#e8f4ea; border-color:#b8d8be; margin-bottom:14px;">
         <b style="color:var(--sage)">Import dari Excel</b>
-        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file Excel Anda. Sistem akan memvalidasi dan mengabaikan baris Total/Summary secara otomatis.</p>
+        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file Excel Anda. Sistem akan mendeteksi nama dan menampilkan checklist sebelum di-import.</p>
         <input type="file" id="excel-input" accept=".xlsx, .xls" onchange="handleExcelUpload(event)" style="width:100%; padding:8px; background:#fff; border:1px solid #b8d8be; border-radius:8px;">
       </div>
       <button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja Manual</button>
@@ -204,7 +252,7 @@ function drawPage() {
   }
 }
 
-// ===== FITUR IMPORT EXCEL (SUDAH DIPERBAIKI) =====
+// ===== FITUR IMPORT EXCEL =====
 async function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -226,34 +274,34 @@ async function handleExcelUpload(e) {
       const sheet = workbook.Sheets[selectedSheet];
       const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
       
-      const newWorkers = [];
+      parsedWorkers = [];
       let currentCategory = 'Grower';
       let colMap = null;
-      let isSummarySection = false; // Penanda agar berhenti saat masuk tabel Summary
+      let isStopped = false; // Penanda berhenti baca jika ketemu Summary
 
       rows.forEach(row => {
-        const rowStr = row.map(c => String(c).trim().toUpperCase());
+        const rowStr = row.map(c => String(c || '').trim().toUpperCase());
+        const rowStrJoin = rowStr.join(' ');
         const bCell = String(row[1] || '').trim();
 
-        // 1. Deteksi jika masuk area Summary / Total
-        if (bCell.toUpperCase() === 'SUMMARY' || bCell.toUpperCase() === 'TOTAL') {
-           isSummarySection = true;
-           colMap = null; // Matikan pembacaan tabel saat ini
+        // 1. DETEKSI SUMMARY / TOTAL (Langsung Stop Baca Tabel)
+        if (rowStrJoin.includes('SUMMARY') || rowStrJoin.includes('TOTAL BIAYA')) {
+           isStopped = true;
+           colMap = null;
            return;
         }
 
-        // 2. Deteksi Judul Kategori (Upah Grower...)
+        // 2. DETEKSI JUDUL KATEGORI BARU
         if (bCell.toLowerCase().startsWith('upah ')) {
           currentCategory = bCell.substring(5).trim();
-          isSummarySection = false; // Reset flag jika ada tabel baru di bawahnya
+          isStopped = false; // Buka blokir jika ada tabel baru di bawahnya
           colMap = null;
           return;
         }
 
-        // Jika sedang di area summary, abaikan semua baris di bawahnya sampai ketemu judul "Upah ..." baru
-        if (isSummarySection) return;
+        if (isStopped) return;
 
-        // 3. Deteksi Header Tabel
+        // 3. DETEKSI HEADER TABEL
         const isHeader = rowStr.includes('NAMA') && rowStr.some(c => c.includes('KEHADIRAN'));
         if (isHeader) {
           colMap = {
@@ -267,20 +315,17 @@ async function handleExcelUpload(e) {
           return;
         }
 
-        // 4. Ekstrak Data Pekerja
+        // 4. EKSTRAK DATA
         if (colMap && colMap.n !== -1) {
           const name = String(row[colMap.n] || '').trim();
           
-          // Abaikan jika kosong, atau nama berisi kata kunci sistem
           if (!name || name.toUpperCase() === 'NAMA' || name.toUpperCase() === 'NO' || name.toLowerCase().includes('total')) return;
 
-          // VALIDASI KETAT: Cek kolom Hadir. Jika isinya teks "Rp" atau ada koma, berarti ini bukan hari kehadiran.
+          // VALIDASI: Cek kolom Hadir. Jika isinya teks "Rp" atau ada koma (bukan murni hari), lewati.
           let rawH = String(row[colMap.h] || '').trim();
-          if (rawH.includes('Rp') || rawH.includes(',')) {
-             return; // Lewati baris ini karena formatnya salah
-          }
+          if (rawH.includes('Rp') || rawH.includes(',')) return;
 
-          // Parsing Lembur (misal 8.34 -> 8 Jam 34 Menit)
+          // Parsing Lembur
           let j = 0, m = 0;
           if (colMap.j !== -1) {
             const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
@@ -308,33 +353,19 @@ async function handleExcelUpload(e) {
             if (rawUpah && rawUpah !== '0') upah = rawUpah;
           }
 
-          // Ambil angka murni dari hari kehadiran
           const hadir = rawH.replace(/[^0-9]/g, '') || '0';
 
-          newWorkers.push({
-            n: name,
-            i: rek,
-            k: currentCategory,
-            h: hadir,
-            j: String(j),
-            m: String(m),
-            r: merah,
-            p: '0',
-            a: upah,
-            b: '', c: ''
+          parsedWorkers.push({
+            n: name, i: rek, k: currentCategory, h: hadir,
+            j: String(j), m: String(m), r: merah, p: '0', a: upah, b: '', c: ''
           });
         }
       });
 
-      if (newWorkers.length > 0) {
-        if (confirm(`Berhasil membaca ${newWorkers.length} pekerja dari Sheet "${selectedSheet}".\n\nGanti data saat ini dengan data baru?`)) {
-          workers = newWorkers;
-          saveToLocal();
-          drawPage();
-          toast('Data berhasil diimport!');
-        }
+      if (parsedWorkers.length > 0) {
+        showImportChecklist(selectedSheet);
       } else {
-        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel sesuai.');
+        alert('Tidak ada data yang terbaca dari Sheet ini.');
       }
 
     } catch (err) {
@@ -345,6 +376,66 @@ async function handleExcelUpload(e) {
     e.target.value = '';
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ===== TAMPILKAN MODAL CHECKLIST =====
+function showImportChecklist(sheetName) {
+  const list = $('import-list');
+  list.innerHTML = '';
+
+  // Kata kunci yang otomatis di-uncheck (karena ini bukan nama orang)
+  const ignoreWords = ['grower gh 1', 'grower gh 2', 'grower gh 1', 'processing', 'satpam', 'house keeping', 'housekeeping', 'grower fertigasi'];
+
+  parsedWorkers.forEach((w, i) => {
+    const isLikelyNotName = ignoreWords.some(word => w.n.toLowerCase().includes(word));
+    
+    const div = document.createElement('div');
+    div.className = 'import-item';
+    div.innerHTML = `
+      <input type="checkbox" id="imp-${i}" ${isLikelyNotName ? '' : 'checked'} onchange="updateImportCount()">
+      <div class="import-item-info">
+        <b>${esc(w.n)}</b>
+        <small>Kategori: ${esc(w.k)} | Hadir: ${w.h} Hari</small>
+      </div>
+      <label for="imp-${i}" style="font-size:12px; color:var(--mute);">Pilih</label>
+    `;
+    list.appendChild(div);
+  });
+
+  document.querySelector('.import-header b').textContent = `Pilih Pekerja (Sheet: ${sheetName})`;
+  $('import-modal').style.display = 'flex';
+  
+  // Set tombol jadi dinamis
+  const btn = document.querySelector('.import-footer button[onclick="confirmImport()"]');
+  updateImportCount(btn);
+}
+
+function updateImportCount(btn) {
+  if(!btn) btn = document.querySelector('.import-footer button[onclick="confirmImport()"]');
+  const checkedCount = document.querySelectorAll('#import-list input[type="checkbox"]:checked').length;
+  btn.textContent = `Import ${checkedCount} Pekerja Terpilih`;
+}
+
+function confirmImport() {
+  const selected = [];
+  const checkboxes = document.querySelectorAll('#import-list input[type="checkbox"]');
+  
+  checkboxes.forEach((cb, i) => {
+    if (cb.checked) selected.push(parsedWorkers[i]);
+  });
+
+  if (selected.length === 0) {
+    return alert('Pilih minimal 1 pekerja untuk di-import.');
+  }
+
+  if (confirm(`Ganti data saat ini dengan ${selected.length} pekerja terpilih?`)) {
+    workers = selected;
+    saveToLocal();
+    $('import-modal').style.display = 'none';
+    drawPage();
+    switchTab('data'); // Pindah ke tab data agar langsung terlihat
+    toast('Data berhasil diimport!');
+  }
 }
 
 function updateW(idx, key, val) {
