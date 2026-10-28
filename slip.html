@@ -10,9 +10,7 @@
 <title>Slip Gaji AWB</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<!-- Library untuk membaca Excel -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- Library untuk PDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   #pdfRenderHost {
@@ -36,7 +34,6 @@
 </header>
 
 <div id="st"></div>
-
 <main id="m"></main>
 
 <nav>
@@ -54,8 +51,7 @@ let currentTab = 'home';
 let workers = [];
 
 const DEFAULT_WORKERS = [
-  {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''},
-  {n:'Cecep Saepudin', i:'54401022961537', k:'Grower GH 1', h:'23', j:'8', m:'34', r:'0', p:'0', a:'', b:'', c:''}
+  {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''}
 ];
 
 const $ = id => document.getElementById(id);
@@ -138,7 +134,7 @@ function drawPage() {
     let html = `
       <div class="card" style="background:#e8f4ea; border-color:#b8d8be; margin-bottom:14px;">
         <b style="color:var(--sage)">Import dari Excel</b>
-        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file <i>Upah Grower & General 2026.xlsx</i> Anda. Sistem akan otomatis membaca data berdasarkan bulan/sheet yang ada di dalamnya.</p>
+        <p class="mute" style="margin:6px 0; font-size:12px;">Upload file Excel Anda. Sistem akan otomatis mencari baris "Nama" & "Kehadiran" dan mengabaikan baris judul.</p>
         <input type="file" id="excel-input" accept=".xlsx, .xls" onchange="handleExcelUpload(event)" style="width:100%; padding:8px; background:#fff; border:1px solid #b8d8be; border-radius:8px;">
       </div>
       <button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja Manual</button>
@@ -208,7 +204,7 @@ function drawPage() {
   }
 }
 
-// ===== FITUR IMPORT EXCEL =====
+// ===== FITUR IMPORT EXCEL (LOGIKA BARU) =====
 async function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -219,7 +215,6 @@ async function handleExcelUpload(e) {
       const data = new Uint8Array(evt.target.result);
       const workbook = XLSX.read(data, {type: 'array'});
       
-      // Tanya user mau baca sheet yang mana
       const sheetList = workbook.SheetNames.join(', ');
       const defaultSheet = workbook.SheetNames[workbook.SheetNames.length - 1];
       const selectedSheet = prompt(`Pilih nama Sheet yang ingin di-import:\n(Tersedia: ${sheetList})`, defaultSheet);
@@ -236,56 +231,65 @@ async function handleExcelUpload(e) {
       let colMap = null;
 
       rows.forEach(row => {
-        // 1. Deteksi Kategori (Baris yang ada tulisan "Upah ...")
-        const colB = String(row[1] || '').trim();
-        if (colB.startsWith('Upah ')) {
-          currentCategory = colB.replace('Upah ', '').trim();
+        // 1. Cek apakah baris ini adalah Judul Kategori (misal: "Upah Grower GH 1")
+        const rowStr = row.map(c => String(c).trim().toUpperCase());
+        const bCell = String(row[1] || '').trim();
+        
+        if (bCell.toLowerCase().startsWith('upah ')) {
+          currentCategory = bCell.substring(5).trim();
+          return; // Lanjut ke baris berikutnya (header)
         }
 
-        // 2. Deteksi Header Tabel (Mencari baris yang ada "Nama" dan "Kehadiran")
-        const findCol = (keyword, exclude = []) => {
-          return row.findIndex(c => {
-            const s = String(c).toUpperCase();
-            return s.includes(keyword.toUpperCase()) && !exclude.some(ex => s.includes(ex.toUpperCase()));
-          });
-        };
-
-        if (row.includes('Nama') && row.some(c => String(c).includes('Kehadiran'))) {
+        // 2. Cek apakah baris ini adalah Header Tabel
+        const isHeader = rowStr.includes('NAMA') && rowStr.some(c => c.includes('KEHADIRAN'));
+        if (isHeader) {
           colMap = {
-            n: findCol('Nama'),
-            h: findCol('Kehadiran', ['Lembur', 'Merah', 'Piket']),
-            a: findCol('Upah/Hari'),
-            j: findCol('Lembur'),
-            r: findCol('Tanggal Merah', ['Nominal']),
-            i: findCol('Rekening')
+            n: rowStr.findIndex(c => c === 'NAMA' || c.includes('NAMA PEKERJA')),
+            h: rowStr.findIndex(c => c.includes('KEHADIRAN') && !c.includes('LEMBUR') && !c.includes('MERAH') && !c.includes('PIKET')),
+            a: rowStr.findIndex(c => c.includes('UPAH') && (c.includes('HARI') || c.includes('SHIFT'))),
+            j: rowStr.findIndex(c => c.includes('LEMBUR') && !c.includes('NOMINAL') && !c.includes('TOTAL')),
+            r: rowStr.findIndex(c => c.includes('MERAH') && !c.includes('NOMINAL') && !c.includes('TOTAL')),
+            i: rowStr.findIndex(c => c.includes('REKENING') || c.includes('BRI'))
           };
           return; // Lanjut ke baris berikutnya (data)
         }
 
-        // 3. Ekstrak Data
-        if (colMap && row[colMap.n]) {
-          const name = String(row[colMap.n]).trim();
-          // Abaikan jika baris kosong atau baris Total
-          if (!name || name === 'Nama' || name.includes('Total') || name.includes('Jumlah')) return;
+        // 3. Ekstrak Data Pekerja
+        if (colMap && colMap.n !== -1) {
+          const name = String(row[colMap.n] || '').trim();
+          
+          // Abaikan jika kosong, atau berisi kata "Total", "Jumlah", "Nama"
+          if (!name || name.toUpperCase() === 'NAMA' || name.includes('Total') || name.includes('Jumlah') || name.includes('Summary')) return;
 
           // Parsing Lembur (misal 8.34 -> 8 Jam 34 Menit)
           let j = 0, m = 0;
-          const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
-          if (rawJ && !isNaN(parseFloat(rawJ))) {
-             if (rawJ.includes('.')) {
-               const parts = rawJ.split('.');
-               j = parseInt(parts[0]) || 0;
-               // Ambil 2 digit, kalau cuma 1 digit berarti puluhan (misal .5 = 50 menit)
-               m = parseInt(parts[1].length === 1 ? parts[1] + '0' : parts[1].substring(0,2)) || 0;
-             } else {
-               j = parseInt(rawJ) || 0;
-             }
+          if (colMap.j !== -1) {
+            const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
+            if (rawJ && !isNaN(parseFloat(rawJ))) {
+              if (rawJ.includes('.')) {
+                const parts = rawJ.split('.');
+                j = parseInt(parts[0]) || 0;
+                // Ambil maksimal 2 digit desimal
+                let mStr = parts[1].substring(0, 2);
+                if (mStr.length === 1) mStr += '0';
+                m = parseInt(mStr) || 0;
+                if (m >= 60) m = 0; // Jaga-jaga jika format aneh
+              } else {
+                j = parseInt(rawJ) || 0;
+              }
+            }
           }
 
-          const rek = colMap.i !== -1 ? String(row[colMap.i]).trim() : '';
-          const upah = colMap.a !== -1 ? String(row[colMap.a]).trim() : '';
-          const hadir = colMap.h !== -1 ? String(row[colMap.h]).trim() : '0';
-          const merah = colMap.r !== -1 ? String(row[colMap.r]).trim() : '0';
+          // Ekstrak data lainnya
+          const rek = colMap.i !== -1 ? String(row[colMap.i] || '').trim() : '';
+          const hadir = colMap.h !== -1 ? String(row[colMap.h] || '').trim() : '0';
+          const merah = colMap.r !== -1 ? String(row[colMap.r] || '').trim() : '0';
+          
+          let upah = '';
+          if (colMap.a !== -1) {
+            const rawUpah = String(row[colMap.a] || '').replace(/[^0-9]/g, ''); 
+            if (rawUpah && rawUpah !== '0') upah = rawUpah;
+          }
 
           newWorkers.push({
             n: name,
@@ -310,7 +314,7 @@ async function handleExcelUpload(e) {
           toast('Data berhasil diimport!');
         }
       } else {
-        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel sesuai.');
+        alert('Tidak ada data yang terbaca. Pastikan format tabel Excel memiliki judul "Nama" dan "Kehadiran".');
       }
 
     } catch (err) {
@@ -318,7 +322,6 @@ async function handleExcelUpload(e) {
       alert('Gagal membaca file Excel. Pastikan file tidak rusak.');
     }
     
-    // Reset input file agar bisa upload file yang sama lagi
     e.target.value = '';
   };
   reader.readAsArrayBuffer(file);
