@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v3';
+const CACHE_NAME = 'awb-apps-v4'; // Naikkan versi setiap kali ada perubahan kode
 const urlsToCache = [
   './',
   './index.html',
@@ -25,6 +25,12 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // JANGAN cache version.json, biarkan selalu ambil dari internet
+  if (e.request.url.includes('version.json')) {
+    return e.respondWith(fetch(e.request));
+  }
+
+  // Untuk file lain, gunakan cache (Cache First)
   e.respondWith(
     caches.match(e.request).then(res => res || fetch(e.request))
   );
