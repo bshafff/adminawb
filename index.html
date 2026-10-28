@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8f1d21">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Slip Gaji AWB</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="hbtns">
+    <button onclick="resetData()">Reset</button>
+  </div>
+  <h1>Slip Gaji AWB</h1>
+  <div class="couple">PT. Agriwangi Berry</div>
+  <small id="sub">Periode: September 2026</small>
+  <div><span id="cn" class="badge">🟢 Siap Digunakan</span></div>
+</header>
+
+<div id="st"></div>
+
+<main id="m">
+  <!-- Konten dirender via JS -->
+</main>
+
+<nav>
+  <button onclick="switchTab('home')" id="nav-home" class="on"><div class="ic">🏠</div>Home</button>
+  <button onclick="switchTab('data')" id="nav-data"><div class="ic">📋</div>Data Pekerja</button>
+  <button onclick="switchTab('setting')" id="nav-setting"><div class="ic">⚙️</div>Pengaturan</button>
+</nav>
+
+<!-- Container khusus untuk render PDF -->
+<div id="pdfRenderHost" style="position:fixed;left:-9999px;top:0;width:520px;background:#fff;"></div>
+
+<script>
+// ===== Konfigurasi & State =====
+const COMPANY = 'PT. AGRI WANGI BERRY';
+const STORE = 'slip-upah-pwa-v1';
+
+let currentTab = 'home';
+let workers = [];
+
+const DEFAULT_WORKERS = [
+  {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Cecep Saepudin', i:'54401022961537', k:'Grower GH 1', h:'23', j:'8', m:'34', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Indra Rudiana', i:'54401094140507', k:'Grower GH 1', h:'25', j:'6', m:'34', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Linda', i:'54401100322500', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Muhamad Hilmy Khomaeni', i:'54401100324502', k:'Grower GH 1', h:'23', j:'6', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Nesti Nurhayati', i:'54401101358504', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Sutiawan', i:'54401101357508', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Pipit Septiani L', i:'54401085557505', k:'Grower GH 1', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Risda Alfauza Yulinar', i:'412101060929539', k:'Grower GH 1', h:'26', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Randiana Agung Januar', i:'001901279029501', k:'Grower GH 1', h:'26', j:'11', m:'34', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Dena Raditya Sutrisna', i:'001901288667508', k:'Grower GH 2', h:'25', j:'4', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Ganjar', i:'054401105836504', k:'Grower GH 2', h:'25', j:'8', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Ilham Jaelani', i:'326901039204505', k:'Grower GH 2', h:'25', j:'6', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Rendi Saeful Nazar', i:'412101026325503', k:'Grower GH 2', h:'26', j:'8', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Rima Rismayanti', i:'326901039090508', k:'Grower GH 2', h:'26', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Rismaya', i:'054401105329507', k:'Grower GH 2', h:'24', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Rudi Saputra', i:'001901293679508', k:'Grower GH 2', h:'26', j:'10', m:'20', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Astrin Julianti K', i:'412101039749500', k:'Processing', h:'25', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Mianti Fatma Kusmawan', i:'411801018850501', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Resa Yolandari', i:'201601034392507', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Santi Susanti', i:'001901275306503', k:'Processing', h:'25', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Tanti Agustina', i:'412101057445538', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Zahra Agesty R', i:'326901038994505', k:'Processing', h:'26', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Yendi Hermawan', i:'326901076957533', k:'Grower Fertigasi', h:'21', j:'0', m:'0', r:'0', p:'0', a:'88000', b:'', c:''},
+  {n:'Rayza Pratama Aldianto', i:'412101039282508', k:'Satpam', h:'30', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Tediansyah', i:'412101059991535', k:'Satpam', h:'30', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Pajar Wiguna', i:'54401050332508', k:'Housekeeping', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''},
+  {n:'Risma', i:'326901075283533', k:'Housekeeping', h:'24', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''}
+];
+
+// ===== Helper =====
+const $ = id => document.getElementById(id);
+const rp = n => (n || n === 0) && Number(n) !== 0 ? 'Rp ' + Math.round(n).toLocaleString('id-ID') : 'Rp -';
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function toast(t) {
+  const e = $('st'); e.textContent = t; e.style.display = 'block';
+  clearTimeout(window._tt); window._tt = setTimeout(() => e.style.display = 'none', 2000);
+}
+
+// ===== Data & Hitungan =====
+function getSetting(k) {
+  const s = JSON.parse(localStorage.slip_settings || '{}');
+  return s[k] || { periode: 'September 2026', tHari: 94200, tLembur: 18000, tMerah: 117750 }[k];
+}
+
+function calc(w) {
+  const tH = w.a !== '' ? num(w.a) : getSetting('tHari');
+  const tL = w.b !== '' ? num(w.b) : getSetting('tLembur');
+  const tM = w.c !== '' ? num(w.c) : getSetting('tMerah');
+  
+  const hadir = Math.round(num(w.h) * tH);
+  const jamLemb = num(w.j) + num(w.m) / 60;
+  const lembur = Math.round(jamLemb * tL);
+  const merah = Math.round(num(w.r) * tM);
+  const pot = num(w.p);
+  
+  return { tH, tL, tM, hadir, lembur, merah, pot, total: hadir + lembur + merah - pot };
+}
+
+function fmtLembur(w) {
+  const j = num(w.j), m = num(w.m);
+  if (!j && !m) return '-';
+  if (!m) return j + ' Jam';
+  return j + ' Jam ' + m + ' Menit';
+}
+
+// ===== Render Halaman =====
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
+  $('nav-' + tab).classList.add('on');
+  drawPage();
+}
+
+function drawPage() {
+  const m = $('m');
+  
+  if (currentTab === 'home') {
+    let total = 0;
+    workers.forEach(w => total += calc(w).total);
+    $('sub').textContent = getSetting('periode');
+    
+    m.innerHTML = `
+      <div class="grid" style="margin-bottom:12px">
+        <div class="card"><div class="mute">Total Pengeluaran</div><div class="num" style="font-size:20px;color:var(--wine)">${rp(total)}</div></div>
+        <div class="card"><div class="mute">Jumlah Pekerja</div><div class="num" style="font-size:20px">${workers.length} orang</div></div>
+      </div>
+      <div class="card">
+        <div class="row"><b>Generator PDF</b></div>
+        <p class="mute" style="margin:10px 0">Simpan slip secara massal (satu per pekerja) atau cetak secara langsung.</p>
+        <div class="grid">
+          <button class="p big" style="grid-column:1/3; background:var(--wine); color:#fff; border:0; border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="saveAllPDF()">📥 Download Semua PDF</button>
+          <button style="grid-column:1/3; border:1px solid var(--wine); background:none; color:var(--wine); border-radius:10px; padding:14px; font:600 16px Figtree,sans-serif;" onclick="window.print()">🖨️ Cetak Semua (Print)</button>
+        </div>
+      </div>
+      <div class="mute" style="text-align:center;margin-top:14px">Versi PWA v1.0</div>
+    `;
+  } 
+  else if (currentTab === 'data') {
+    $('sub').textContent = workers.length + ' Pekerja';
+    let html = `<button onclick="addWorker()" style="padding:11px;border-radius:10px;font:600 14px Figtree,sans-serif;width:100%;border:1px dashed var(--wine);background:none;color:var(--wine);margin-bottom:12px">+ Tambah Pekerja</button>`;
+    
+    workers.forEach((w, idx) => {
+      const c = calc(w);
+      html += `
+        <div class="card" style="padding:12px">
+          <div class="row" style="margin-bottom:8px">
+            <input type="text" value="${esc(w.n)}" placeholder="Nama" onchange="updateW(${idx},'n',this.value)" style="font-weight:600; border:0; border-bottom:1px dashed var(--line); padding:4px;">
+            <button onclick="delWorker(${idx})" style="border:0;background:none;color:#a33;font-size:18px">🗑️</button>
+          </div>
+          <div class="grid" style="gap:8px">
+            <div><label class="mute" style="font-size:11px">Kategori</label><input type="text" value="${esc(w.k)}" onchange="updateW(${idx},'k',this.value)"></div>
+            <div><label class="mute" style="font-size:11px">Rekening</label><input type="text" value="${esc(w.i)}" onchange="updateW(${idx},'i',this.value)"></div>
+            <div><label class="mute" style="font-size:11px">Hadir (Hari)</label><input type="number" value="${esc(w.h)}" onchange="updateW(${idx},'h',this.value)"></div>
+            <div>
+              <label class="mute" style="font-size:11px">Lembur (J/M)</label>
+              <div style="display:flex; gap:4px">
+                <input type="number" value="${esc(w.j)}" placeholder="Jam" onchange="updateW(${idx},'j',this.value)">
+                <input type="number" value="${esc(w.m)}" placeholder="Mnt" onchange="updateW(${idx},'m',this.value)">
+              </div>
+            </div>
+          </div>
+          <details style="margin-top:10px; border-top:1px solid var(--line); padding-top:8px">
+            <summary class="mute" style="font-size:12px;cursor:pointer">Tarif Khusus / Potongan</summary>
+            <div class="grid" style="margin-top:8px">
+              <div><label class="mute" style="font-size:11px">Upah/Hari</label><input type="number" value="${esc(w.a)}" placeholder="${getSetting('tHari')}" onchange="updateW(${idx},'a',this.value)"></div>
+              <div><label class="mute" style="font-size:11px">Potongan (Rp)</label><input type="number" value="${esc(w.p)}" onchange="updateW(${idx},'p',this.value)"></div>
+            </div>
+          </details>
+          <div class="row" style="margin-top:10px; border-top:1px dashed var(--line); padding-top:8px">
+            <span class="mute">Total Diterima</span>
+            <strong style="color:var(--wine)">${rp(c.total)}</strong>
+          </div>
+        </div>
+      `;
+    });
+    m.innerHTML = html;
+  }
+  else if (currentTab === 'setting') {
+    const s = JSON.parse(localStorage.slip_settings || '{}');
+    const tHari = s.tHari || 94200;
+    const tLembur = s.tLembur || 18000;
+    const tMerah = s.tMerah || 117750;
+    const periode = s.periode || 'September 2026';
+    
+    m.innerHTML = `
+      <div class="card">
+        <h3 style="margin:0 0 12px;font-family:Fraunces,serif;color:var(--wine)">Pengaturan Global</h3>
+        <label>Periode</label>
+        <input type="text" id="set-periode" value="${periode}">
+        <label style="margin-top:10px">Upah Standar / Hari (Rp)</label>
+        <input type="number" id="set-thari" value="${tHari}">
+        <label style="margin-top:10px">Lembur / Jam (Rp)</label>
+        <input type="number" id="set-tlembur" value="${tLembur}">
+        <label style="margin-top:10px">Upah Tanggal Merah / Hari (Rp)</label>
+        <input type="number" id="set-tmerah" value="${tMerah}">
+        
+        <button onclick="saveSetting()" style="margin-top:20px; width:100%; padding:13px; border:0; border-radius:10px; background:var(--wine); color:#fff; font:600 15px Figtree,sans-serif">Simpan Pengaturan</button>
+      </div>
+    `;
+  }
+}
+
+// ===== CRUD Pekerja & Setting =====
+function updateW(idx, key, val) {
+  workers[idx][key] = val;
+  saveToLocal();
+  drawPage();
+}
+
+function addWorker() {
+  workers.push({n:'', i:'', k:'Grower GH 1', h:'0', j:'0', m:'0', r:'0', p:'0', a:'', b:'', c:''});
+  saveToLocal();
+  drawPage();
+}
+
+function delWorker(idx) {
+  if (confirm('Hapus pekerja ini?')) {
+    workers.splice(idx, 1);
+    saveToLocal();
+    drawPage();
+  }
+}
+
+function saveSetting() {
+  const s = {
+    periode: $('set-periode').value,
+    tHari: num($('set-thari').value),
+    tLembur: num($('set-tlembur').value),
+    tMerah: num($('set-tmerah').value)
+  };
+  localStorage.slip_settings = JSON.stringify(s);
+  toast('Pengaturan disimpan');
+  drawPage();
+}
+
+function resetData() {
+  if (confirm('Kembalikan ke data awal (Excel)? Semua perubahan akan hilang.')) {
+    workers = JSON.parse(JSON.stringify(DEFAULT_WORKERS));
+    saveToLocal();
+    drawPage();
+    toast('Data direset');
+  }
+}
+
+function saveToLocal() {
+  localStorage.setItem(STORE, JSON.stringify(workers));
+}
+
+// ===== PDF Generation =====
+function slipHTML(w) {
+  const c = calc(w);
+  const kat = (w.k || 'Grower').toUpperCase();
+  const periode = getSetting('periode');
+  
+  return `<div class="slip">
+    <h3>${COMPANY}</h3>
+    <h4>SLIP UPAH ${kat}</h4>
+    <div class="per">Periode : <strong>${periode}</strong></div>
+    <table>
+      <tr><td>Nama</td><td>: ${esc(w.n)}</td></tr>
+      <tr><td>Rekening BRI</td><td>: ${esc(w.i)}</td></tr>
+      <tr><td>Hari Kehadiran</td><td>: ${num(w.h)} Hari</td></tr>
+      <tr><td>Upah per Hari</td><td>: ${rp(c.tH)}</td></tr>
+      <tr><td>Total Upah Kehadiran</td><td>: ${rp(c.hadir)}</td></tr>
+      <tr><td>Total Jam Lembur</td><td>: ${esc(fmtLembur(w))}</td></tr>
+      <tr><td>Tarif Lembur per Jam</td><td>: ${rp(c.tL)}</td></tr>
+      <tr><td>Total Upah Lembur</td><td>: ${rp(c.lembur)}</td></tr>
+      <tr><td>Hari Kehadiran Tanggal Merah</td><td>: ${num(w.r) ? num(w.r) + ' Hari' : '-'}</td></tr>
+      <tr><td>Tarif Tanggal Merah</td><td>: ${rp(c.tM)}</td></tr>
+      <tr><td>Total Upah Tanggal Merah</td><td>: ${rp(c.merah)}</td></tr>
+      <tr><td>Potongan</td><td>: ${c.pot ? rp(c.pot) : '-'}</td></tr>
+      <tr class="t"><td>TOTAL DITERIMA</td><td>${rp(c.total)}</td></tr>
+    </table>
+    <div class="ttd">
+      <div class="lbl">Tanda Terima,</div>
+      <div class="line">(__________________)</div>
+    </div>
+  </div>`;
+}
+
+async function saveSlipPDF(w) {
+  if (typeof html2pdf === 'undefined') return alert('Library PDF belum siap.');
+  const host = $('pdfRenderHost');
+  host.innerHTML = slipHTML(w);
+  
+  const el = host.querySelector('.slip');
+  const safeName = String(w.n || 'Pekerja').replace(/[\\/:*?"<>|]+/g, '');
+  
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `Slip Gaji - ${safeName}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(el).save();
+  } catch (err) {
+    console.error(err);
+  }
+  host.innerHTML = '';
+}
+
+async function saveAllPDF() {
+  const valid = workers.filter(w => w.n && w.n.trim());
+  if (!valid.length) return alert('Belum ada pekerja.');
+  if (!confirm(`Simpan ${valid.length} file PDF? Browser mungkin meminta izin unduh multiple files.`)) return;
+  
+  const btn = document.querySelector('button[onclick="saveAllPDF()"]');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  
+  for (let i = 0; i < valid.length; i++) {
+    btn.textContent = `Menyimpan ${i + 1}/${valid.length}...`;
+    await saveSlipPDF(valid[i]);
+    await new Promise(r => setTimeout(r, 350));
+  }
+  
+  btn.textContent = orig;
+  btn.disabled = false;
+  alert('Selesai mengunduh PDF.');
+}
+
+// ===== Init =====
+if (localStorage.getItem(STORE)) {
+  workers = JSON.parse(localStorage.getItem(STORE));
+} else {
+  workers = JSON.parse(JSON.stringify(DEFAULT_WORKERS));
+  saveToLocal();
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW gagal:', err));
+  });
+}
+
+drawPage();
+</script>
+</body>
+</html>
