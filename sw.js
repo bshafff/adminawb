@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v5'; // Ubah versi cache
+const CACHE_NAME = 'awb-apps-v6'; // Ubah ke v6
 const urlsToCache = [
   './',
   './index.html',
