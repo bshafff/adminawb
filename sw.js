@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v5'; // Naikkan versi setiap kali ada perubahan kode
+const CACHE_NAME = 'awb-apps-v5'; // Ubah versi cache
 const urlsToCache = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const urlsToCache = [
   './stok.html',
   './style.css',
   './manifest.json',
+  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
 ];
 
@@ -25,12 +26,9 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // JANGAN cache version.json, biarkan selalu ambil dari internet
   if (e.request.url.includes('version.json')) {
     return e.respondWith(fetch(e.request));
   }
-
-  // Untuk file lain, gunakan cache (Cache First)
   e.respondWith(
     caches.match(e.request).then(res => res || fetch(e.request))
   );
