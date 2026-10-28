@@ -277,15 +277,15 @@ async function handleExcelUpload(e) {
       parsedWorkers = [];
       let currentCategory = 'Grower';
       let colMap = null;
-      let isStopped = false; // Penanda berhenti baca jika ketemu Summary
+      let isStopped = false; 
 
       rows.forEach(row => {
+        if (!row || row.length === 0) return;
         const rowStr = row.map(c => String(c || '').trim().toUpperCase());
-        const rowStrJoin = rowStr.join(' ');
-        const bCell = String(row[1] || '').trim();
+        const bCell = String(row[1] || '').trim(); // Kolom B biasanya berisi "Summary" atau "Upah ..."
 
-        // 1. DETEKSI SUMMARY / TOTAL (Langsung Stop Baca Tabel)
-        if (rowStrJoin.includes('SUMMARY') || rowStrJoin.includes('TOTAL BIAYA')) {
+        // 1. DETEKSI SUMMARY (Hanya jika kolom B isinya "SUMMARY")
+        if (bCell.toUpperCase() === 'SUMMARY') {
            isStopped = true;
            colMap = null;
            return;
@@ -321,11 +321,11 @@ async function handleExcelUpload(e) {
           
           if (!name || name.toUpperCase() === 'NAMA' || name.toUpperCase() === 'NO' || name.toLowerCase().includes('total')) return;
 
-          // VALIDASI: Cek kolom Hadir. Jika isinya teks "Rp" atau ada koma (bukan murni hari), lewati.
           let rawH = String(row[colMap.h] || '').trim();
+          // Validasi: Hadir tidak boleh mengandung "Rp" atau koma (harus angka murni)
           if (rawH.includes('Rp') || rawH.includes(',')) return;
 
-          // Parsing Lembur
+          // Parsing Lembur (8.34 -> 8 Jam 34 Menit)
           let j = 0, m = 0;
           if (colMap.j !== -1) {
             const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
@@ -365,7 +365,7 @@ async function handleExcelUpload(e) {
       if (parsedWorkers.length > 0) {
         showImportChecklist(selectedSheet);
       } else {
-        alert('Tidak ada data yang terbaca dari Sheet ini.');
+        alert('Tidak ada data yang terbaca dari Sheet ini. Pastikan format tabel Excel sesuai.');
       }
 
     } catch (err) {
@@ -433,7 +433,7 @@ function confirmImport() {
     saveToLocal();
     $('import-modal').style.display = 'none';
     drawPage();
-    switchTab('data'); // Pindah ke tab data agar langsung terlihat
+    switchTab('data'); 
     toast('Data berhasil diimport!');
   }
 }
