@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v8'; // Ubah ke v8
+const CACHE_NAME = 'awb-apps-v9'; // Ubah ke v9
 const urlsToCache = [
   './',
   './index.html',
