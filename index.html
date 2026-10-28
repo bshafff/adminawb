@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>AWB Apps</title>
+<title>Administrasi Farm</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -19,6 +19,11 @@
 </header>
 
 <main>
+  <!-- Tombol Update PWA -->
+  <button id="btn-update" class="update-btn" onclick="doUpdate()">
+    <span id="update-text">Memeriksa versi...</span>
+  </button>
+
   <div class="menu-title">PILIH MENU</div>
 
   <a href="slip.html" class="menu-item">
@@ -40,12 +45,86 @@
   </a>
 </main>
 
+<!-- Toast Notifikasi -->
+<div id="toast" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#2a1618;color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;display:none;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);">Teks</div>
+
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW gagal:', err));
-    });
+  // === LOGIKA UPDATE PWA ===
+  let appVersion = localStorage.getItem('app_version') || '1.0.0';
+  let serverVersion = appVersion;
+  let isUpdateAvailable = false;
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3000);
   }
+
+  async function checkUpdate() {
+    const btn = document.getElementById('btn-update');
+    const txt = document.getElementById('update-text');
+    
+    try {
+      // Cek file version.json (tambahkan timestamp agar tidak di-cache browser)
+      const res = await fetch('./version.json?t=' + Date.now());
+      const data = await res.json();
+      serverVersion = data.v;
+
+      if (serverVersion !== appVersion) {
+        // Ada update
+        isUpdateAvailable = true;
+        btn.className = 'update-btn has-update';
+        txt.innerHTML = `⬇️ Update Tersedia (v${serverVersion})`;
+      } else {
+        // Sudah terbaru
+        isUpdateAvailable = false;
+        btn.className = 'update-btn is-latest';
+        txt.innerHTML = `✓ Versi Terbaru (v${appVersion})`;
+      }
+    } catch (e) {
+      txt.innerHTML = `Gagal cek update`;
+    }
+  }
+
+  async function doUpdate() {
+    if (!isUpdateAvailable) {
+      return showToast('Aplikasi sudah versi terbaru.');
+    }
+
+    const btn = document.getElementById('btn-update');
+    const txt = document.getElementById('update-text');
+    btn.disabled = true;
+    txt.innerHTML = '⏳ Memperbarui, mohon tunggu...';
+
+    try {
+      // 1. Hapus Service Worker lama
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (let reg of regs) await reg.unregister();
+      }
+      // 2. Hapus Cache
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      // 3. Simpan versi baru ke HP
+      localStorage.setItem('app_version', serverVersion);
+    } catch (e) {
+      console.log('Gagal clear cache', e);
+    }
+    
+    // 4. Hard Reload halaman (seperti Ctrl+Shift+R)
+    window.location.replace(window.location.pathname + '?v=' + Date.now());
+  }
+
+  // Jalankan pengecekan saat aplikasi dibuka
+  window.addEventListener('load', () => {
+    checkUpdate();
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW gagal:', err));
+    }
+  });
 </script>
 </body>
 </html>
