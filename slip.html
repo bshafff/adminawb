@@ -13,23 +13,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
-  /* PERBAIKAN CSS UNTUK RENDER PDF */
+  /* PERBAIKAN: Render tepat di tengah layar, transparan, tidak dilempar ke kiri */
   #pdfRenderHost {
-    position: absolute;
+    position: fixed;
     top: 0;
-    left: -9999px; /* Sembunyikan di luar layar kiri */
-    width: 800px;  /* Lebar tetap agar konsisten */
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    z-index: -9999;
+    opacity: 0.01; /* Hampir tak terlihat, tapi tetap dirender browser */
     background: #fff;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  #pdfRenderHost .slip {
+    width: 100%;
+    max-width: 600px;
+    background: #fff;
+    margin: 0;
+    border: none;
   }
   
-  /* Kunci Layout Tabel agar tidak berantakan */
-  .slip table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    table-layout: fixed; 
-  }
-  .slip td:first-child { width: 60%; }
-  .slip td:last-child { width: 40%; text-align: right; }
+  /* Kunci layout tabel agar seimbang */
+  .slip { width: 100%; table-layout: fixed; }
+  .slip td:first-child { width: 60%; word-wrap: break-word; }
+  .slip td:last-child { width: 40%; text-align: right; white-space: nowrap; }
 
   /* CSS Modal Import */
   #import-modal {
@@ -86,7 +96,6 @@
   <button onclick="switchTab('setting')" id="nav-setting"><div class="ic">⚙️</div>Pengaturan</button>
 </nav>
 
-<!-- Modal untuk memilih nama yang mau di-import -->
 <div id="import-modal">
   <div class="import-content">
     <div class="import-header">
@@ -108,7 +117,7 @@ const COMPANY = 'PT. AGRI WANGI BERRY';
 const STORE = 'slip-upah-pwa-v1';
 let currentTab = 'home';
 let workers = [];
-let parsedWorkers = [];
+let parsedWorkers = []; 
 
 const DEFAULT_WORKERS = [
   {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''}
@@ -490,7 +499,7 @@ function slipHTML(w) {
   const kat = (w.k || 'Grower').toUpperCase();
   const periode = getSetting('periode');
   
-  return `<div class="slip">
+  return `<div class="slip" style="width: 100%; max-width: 600px;">
     <h3>${COMPANY}</h3>
     <h4>SLIP UPAH ${kat}</h4>
     <div class="per">Periode : <strong>${periode}</strong></div>
@@ -523,7 +532,7 @@ async function saveSlipPDF(w) {
   const host = $('pdfRenderHost');
   host.innerHTML = slipHTML(w);
   
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise(r => setTimeout(r, 250));
   
   const el = host.querySelector('.slip');
   const safeName = String(w.n).replace(/[\\/:*?"<>|]+/g, '');
@@ -539,7 +548,7 @@ async function saveSlipPDF(w) {
         backgroundColor: '#ffffff',
         scrollX: 0,
         scrollY: 0,
-        windowWidth: 800, 
+        windowWidth: 600,
         windowHeight: el.offsetHeight + 100
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
