@@ -216,7 +216,17 @@ function drawSetting() {
     <div class="card">
       <h3 style="margin:0 0 10px;font-family:Fraunces,serif;color:var(--wine)">Koneksi Google Sheet</h3>
       <label class="mute">URL Web App (Apps Script, berakhiran /exec)</label>
-      <input type="text" id="s-url" value="${esc(localStorage.getItem(LS_URL) || '')}" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%">
+      <input type="text" id="s-url" value="${esc(localStorage.getItem(LS_URL) || '')}" placeholder="function drawSetting() {
+  const lines = (arr, fn) => arr.map(fn).join('\n');
+  $('m').innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-family:Fraunces,serif;color:var(--wine)">Koneksi Google Sheet</h3>
+      <label class="mute">URL Web App (Apps Script, berakhiran /exec)</label>
+      <input type="text" id="s-url" value="${esc(localStorage.getItem(LS_URL) || '')}" placeholder="https://script.google.com/macros/s/AKfycbzRVMAM5fq8NNMOzNpIXAMLlH8entqaxlonaDNaCWtig6R8so-nOF5VuOKskU5OkIZ6/exec" style="width:100%">
+      <label class="mute" style="margin-top:10px;display:block">PIN</label>
+      <input type="text" id="s-pin" value="${esc(localStorage.getItem(LS_PIN) || '')}" placeholder="PIN dari Script Properties" style="width:100%">
+      <button class="btn pri" style="width:100%;margin-top:14px" onclick="saveConn()">Simpan & Tes Koneksi</button>
+    </div>" style="width:100%">
       <label class="mute" style="margin-top:10px;display:block">PIN</label>
       <input type="text" id="s-pin" value="${esc(localStorage.getItem(LS_PIN) || '')}" placeholder="PIN dari Script Properties" style="width:100%">
       <button class="btn pri" style="width:100%;margin-top:14px" onclick="saveConn()">Simpan & Tes Koneksi</button>
