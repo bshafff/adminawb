@@ -29,6 +29,11 @@
   .btn2[disabled]{opacity:.55}
   .btnrow{display:flex;gap:8px;margin:8px 0 12px}
   .btnrow .btn2{margin-top:0}
+  .warn{background:#fff8e6;border:1px solid #f0d58a;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;margin-bottom:10px}
+  .warn b{color:#8a6a10}
+  .qtag{display:inline-block;padding:2px 8px;border-radius:8px;background:#e8f4ea;color:#3d6b41;font-size:11px;font-weight:600}
+  .qtag.hemat{background:#fff3d6;color:#8a6a10}
+  .qtag.super{background:#fde8e4;color:#a33}
 </style>
 </head>
 <body>
@@ -48,7 +53,7 @@
   <!-- 1. UPLOAD -->
   <div class="card">
     <b style="font-family:Fraunces,serif;color:var(--wine)">1. Upload Screenshot Invoice</b>
-    <p class="mute" style="margin:6px 0 10px;font-size:12px">Pilih semua screenshot sekaligus (bisa 30–50 file). Setelah masuk, urutannya bisa diatur.</p>
+    <p class="mute" style="margin:6px 0 10px;font-size:12px">Pilih semua screenshot sekaligus (bisa 30–100 file). Setelah masuk, urutannya bisa diatur.</p>
     <div class="drop" id="drop">
       <div class="big">🖼️</div>
       <div style="font-weight:600;margin-top:6px">Ketuk untuk pilih gambar</div>
@@ -57,6 +62,9 @@
     </div>
     <div class="prog" id="prog" style="display:none"><i></i></div>
     <div class="mute" id="pinfo" style="font-size:12px;margin-top:6px;display:none"></div>
+    <div class="mute" style="font-size:11px;margin-top:8px;line-height:1.5">
+      ℹ️ Kompresi otomatis menyesuaikan jumlah gambar — makin banyak, makin kecil per gambar supaya HP tetap ringan & file tidak terlalu besar.
+    </div>
   </div>
 
   <!-- 2. URUTKAN -->
@@ -67,6 +75,7 @@
       <button class="btn2 sec" onclick="sortByName()">↕ Urut Nama File</button>
       <button class="btn2 sec" onclick="clearAll()">🗑️ Hapus Semua</button>
     </div>
+    <div id="statline" class="mute" style="font-size:11px;margin-bottom:8px"></div>
     <div class="thumbs" id="thumbs"></div>
   </div>
 
@@ -74,6 +83,7 @@
   <div class="card" id="genCard" style="display:none">
     <b style="font-family:Fraunces,serif;color:var(--wine)">3. Buat Dokumen</b>
     <p class="mute" style="margin:6px 0 10px;font-size:12px">PDF: 1 screenshot = 1 halaman A4. Word: 4 screenshot per halaman (2×2) siap print.</p>
+    <div id="warn" class="warn" style="display:none"></div>
     <button class="btn2 pri" id="btnPdf" onclick="makePDF()">📄 Buat PDF (1 per halaman)</button>
     <button class="btn2 sec" id="btnDoc" onclick="makeWord()">📝 Buat Word (4 per halaman)</button>
     <div class="prog" id="prog2" style="display:none"><i></i></div>
@@ -82,9 +92,10 @@
 
   <div class="card mute" style="font-size:12px;line-height:1.6">
     <b>Catatan:</b><br>
-    • Format gambar yang didukung: JPG / PNG / WEBP. (HEIC dari iPhone sebaiknya diubah dulu ke JPG.)<br>
-    • Gambar otomatis dikecilkan ke maksimal 1600 px supaya proses ringan & file tidak terlalu besar.<br>
-    • File Word berformat <b>.docx</b> asli, bisa langsung dibuka & di-print dari Microsoft Word / WPS.
+    • Format gambar: JPG / PNG / WEBP. (HEIC dari iPhone sebaiknya diubah dulu ke JPG.)<br>
+    • Gambar otomatis dikecilkan & dikompres. Untuk batch besar (60+ gambar), kualitas sedikit diturunkan supaya file tidak kebesaran & HP tidak crash.<br>
+    • File Word berformat <b>.docx</b> asli, bisa langsung dibuka & di-print dari Microsoft Word / WPS.<br>
+    • Proses 60+ gambar bisa makan 1–3 menit. <b>Jangan tutup tab</b> selama proses berjalan.
   </div>
 </main>
 
@@ -101,12 +112,35 @@ function todayStr(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+function fmtSize(bytes){
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(0) + ' KB';
+  return (bytes/1024/1024).toFixed(1) + ' MB';
+}
 function setProg(progId, infoId, pct, label){
   const p = $(progId), t = $(infoId);
   if (pct === null) { p.style.display='none'; t.style.display='none'; return; }
   p.style.display = 'block'; t.style.display = 'block';
   p.firstElementChild.style.width = pct + '%';
   t.textContent = label;
+}
+
+/* ============ KOMPRESI ADAPTIF ============
+   Semakin banyak gambar, semakin agresif kompresi
+   supaya memori & ukuran file aman untuk HP. */
+function getQualityConfig(n){
+  if (n <= 30)  return { MAX: 1600, q: 0.90, label: 'Standar', cls: '' };
+  if (n <= 60)  return { MAX: 1400, q: 0.85, label: 'Adaptif', cls: '' };
+  if (n <= 100) return { MAX: 1200, q: 0.82, label: 'Hemat', cls: 'hemat' };
+  return           { MAX: 1000, q: 0.78, label: 'Super Hemat', cls: 'super' };
+}
+function estimateBytes(){
+  // Base64 overhead ~33% → data URL length × 0.75 ≈ byte asli
+  return imgs.reduce((a, im) => a + im.url.length, 0) * 0.75;
+}
+function estimateOutput(){
+  // PDF/Word menambah struktur & metadata ~ 15%
+  return estimateBytes() * 1.15;
 }
 
 /* ================= UPLOAD ================= */
@@ -119,15 +153,14 @@ drop.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files)
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 
-function readFile(file){
+function readFile(file, cfg){
   return new Promise((resolve, reject) => {
     const objUrl = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const MAX = 1600;
       const w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height;
       if (!w0 || !h0) { URL.revokeObjectURL(objUrl); return reject(new Error('ukuran 0')); }
-      const sc = Math.min(1, MAX / Math.max(w0, h0));
+      const sc = Math.min(1, cfg.MAX / Math.max(w0, h0));
       const cw = Math.max(1, Math.round(w0 * sc)), ch = Math.max(1, Math.round(h0 * sc));
       const cv = document.createElement('canvas');
       cv.width = cw; cv.height = ch;
@@ -135,7 +168,7 @@ function readFile(file){
       cx.fillStyle = '#ffffff'; cx.fillRect(0, 0, cw, ch);
       cx.drawImage(img, 0, 0, cw, ch);
       let data = null;
-      try { data = cv.toDataURL('image/jpeg', 0.9); } catch (err) { data = null; }
+      try { data = cv.toDataURL('image/jpeg', cfg.q); } catch (err) { data = null; }
       URL.revokeObjectURL(objUrl);
       if (!data) return reject(new Error('konversi gagal'));
       resolve({ url: data, w: cw, h: ch });
@@ -151,11 +184,14 @@ async function addFiles(fileList){
   if (!files.length) return toast('Tidak ada file gambar yang dipilih');
 
   busy = true;
+  // Hitung config berdasarkan total akhir (existing + batch baru)
+  const cfg = getQualityConfig(imgs.length + files.length);
   let ok = 0, fail = 0;
   for (let i = 0; i < files.length; i++){
-    setProg('prog','pinfo', Math.round((i / files.length) * 100), `Memproses ${i+1}/${files.length} — ${files[i].name}`);
+    setProg('prog','pinfo', Math.round((i / files.length) * 100),
+      `Memproses ${i+1}/${files.length} (${cfg.label}) — ${files[i].name}`);
     try {
-      const r = await readFile(files[i]);
+      const r = await readFile(files[i], cfg);
       imgs.push({ name: files[i].name, url: r.url, w: r.w, h: r.h });
       ok++;
     } catch (e) { fail++; console.warn('Gagal:', files[i].name, e); }
@@ -164,14 +200,37 @@ async function addFiles(fileList){
   busy = false;
   setProg('prog','pinfo', null);
   render();
-  toast(`${ok} gambar ditambahkan${fail ? ', ' + fail + ' gagal' : ''}`);
+  toast(`${ok} gambar ditambahkan${fail ? ', ' + fail + ' gagal' : ''} (${cfg.label})`);
 }
 
 /* ================= LIST ================= */
 function render(){
   $('listCard').style.display = imgs.length ? 'block' : 'none';
   $('genCard').style.display  = imgs.length ? 'block' : 'none';
-  $('count').textContent = imgs.length ? imgs.length + ' gambar' : '';
+
+  // Info ringkas
+  if (imgs.length){
+    const q = getQualityConfig(imgs.length);
+    $('count').innerHTML = imgs.length + ' gambar <span class="qtag ' + q.cls + '">' + q.label + '</span>';
+    $('statline').textContent =
+      'Total ukuran gambar: ' + fmtSize(estimateBytes()) +
+      ' · Perkiraan hasil PDF/Word: ± ' + fmtSize(estimateOutput());
+  }
+
+  // Warning untuk batch besar
+  const warn = $('warn');
+  if (imgs.length >= 50){
+    warn.style.display = 'block';
+    warn.innerHTML =
+      '<b>⚠️ ' + imgs.length + ' gambar terdeteksi</b><br>' +
+      'Proses PDF/Word bisa makan 1–3 menit. <b>Jangan tutup tab</b> selama proses. ' +
+      'Perkiraan ukuran file hasil: <b>± ' + fmtSize(estimateOutput()) + '</b>' +
+      (imgs.length > 100
+        ? '<br><span style="color:#a33"><b>Tips:</b> karena sangat banyak, pertimbangkan bagi jadi 2 batch (misal 1–50, 51–' + imgs.length + ') supaya lebih aman di HP.</span>'
+        : '');
+  } else {
+    warn.style.display = 'none';
+  }
 
   const box = $('thumbs');
   box.innerHTML = '';
@@ -220,7 +279,6 @@ function loadScript(src){
     document.head.appendChild(s);
   });
 }
-
 async function ensureJsPDF(){
   if (window.jspdf && window.jspdf.jsPDF) return;
   const urls = [
@@ -231,7 +289,6 @@ async function ensureJsPDF(){
   for (const u of urls){ try { await loadScript(u); if (window.jspdf && window.jspdf.jsPDF) return; } catch(e){} }
   throw new Error('Pustaka PDF tidak bisa dimuat. Periksa koneksi internet.');
 }
-
 async function ensureDocx(){
   if (window.docx) return;
   const urls = [
@@ -242,7 +299,6 @@ async function ensureDocx(){
   for (const u of urls){ try { await loadScript(u); if (window.docx) return; } catch(e){} }
   throw new Error('Pustaka Word tidak bisa dimuat. Periksa koneksi internet.');
 }
-
 function download(blob, name){
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -251,7 +307,6 @@ function download(blob, name){
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
 }
-
 function dataURLtoU8(dataURL){
   const b64 = dataURL.split(',')[1];
   const bin = atob(b64);
@@ -267,6 +322,7 @@ async function makePDF(){
   busy = true; $('btnPdf').disabled = true; $('btnDoc').disabled = true;
 
   try {
+    setProg('prog2','pinfo2', 3, 'Memuat pustaka PDF…');
     await ensureJsPDF();
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
@@ -279,15 +335,19 @@ async function makePDF(){
       const r = Math.min(aw / im.w, ah / im.h);
       const w = im.w * r, h = im.h * r;
       pdf.addImage(im.url, 'JPEG', (PW - w) / 2, (PH - h) / 2, w, h, undefined, 'FAST');
-      setProg('prog2','pinfo2', Math.round(((i+1)/imgs.length)*100), `Menyusun PDF ${i+1}/${imgs.length}`);
-      if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      setProg('prog2','pinfo2', Math.round(((i+1)/imgs.length)*100),
+        `Menyusun PDF ${i+1}/${imgs.length} — jangan tutup tab`);
+      // Beri napas ke UI setiap 3 gambar (terutama untuk batch besar)
+      if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
     }
 
+    setProg('prog2','pinfo2', 99, 'Mengemas file PDF…');
     pdf.save('Invoice Pembelian ' + todayStr() + '.pdf');
     toast('PDF selesai dibuat');
   } catch (e) {
     console.error(e);
-    alert('Gagal membuat PDF: ' + e.message);
+    alert('Gagal membuat PDF: ' + e.message +
+      '\n\nJika jumlah gambar banyak, coba bagi jadi 2 batch lalu gabung PDF-nya.');
   } finally {
     busy = false; $('btnPdf').disabled = false; $('btnDoc').disabled = false;
     setProg('prog2','pinfo2', null);
@@ -308,8 +368,8 @@ async function makeWord(){
     const { Document, Packer, Paragraph, ImageRun, Table, TableRow, TableCell,
             WidthType, AlignmentType, BorderStyle, PageBreak } = d;
 
-    const MAXW = 330;
-    const MAXH = 390;
+    // Lebar/tinggi maks gambar per sel (dalam px Word)
+    const MAXW = 330, MAXH = 390;
 
     const NB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
     const NO_BORDER = { top: NB, bottom: NB, left: NB, right: NB, insideHorizontal: NB, insideVertical: NB };
@@ -319,7 +379,8 @@ async function makeWord(){
 
     const children = [];
 
-    pages.forEach((grp, pi) => {
+    for (let pi = 0; pi < pages.length; pi++){
+      const grp = pages[pi];
       const rows = [];
       for (let r = 0; r < 2; r++){
         const cells = [];
@@ -360,8 +421,11 @@ async function makeWord(){
 
       if (pi < pages.length - 1) children.push(new Paragraph({ children: [ new PageBreak() ] }));
 
-      setProg('prog2','pinfo2', Math.round(((pi+1)/pages.length)*100), `Menyusun Word halaman ${pi+1}/${pages.length}`);
-    });
+      setProg('prog2','pinfo2', Math.round(((pi+1)/pages.length)*90),
+        `Menyusun Word halaman ${pi+1}/${pages.length} — jangan tutup tab`);
+      // Beri jeda supaya UI tidak freeze
+      if (pi % 3 === 0) await new Promise(r => setTimeout(r, 0));
+    }
 
     const doc = new Document({
       sections: [{
@@ -375,13 +439,14 @@ async function makeWord(){
       }]
     });
 
-    setProg('prog2','pinfo2', 92, 'Mengemas file .docx…');
+    setProg('prog2','pinfo2', 95, 'Mengemas file .docx…');
     const blob = await Packer.toBlob(doc);
     download(blob, 'Invoice Pembelian ' + todayStr() + '.docx');
     toast('File Word selesai dibuat');
   } catch (e) {
     console.error(e);
-    alert('Gagal membuat Word: ' + e.message);
+    alert('Gagal membuat Word: ' + e.message +
+      '\n\nJika jumlah gambar banyak, coba bagi jadi 2 batch.');
   } finally {
     busy = false; $('btnPdf').disabled = false; $('btnDoc').disabled = false;
     setProg('prog2','pinfo2', null);
