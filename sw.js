@@ -1,4 +1,4 @@
-const CACHE_NAME = 'awb-apps-v17';
+const CACHE_NAME = 'awb-apps-v18';
 const urlsToCache = [
   './',
   './index.html',
@@ -14,8 +14,6 @@ const urlsToCache = [
   'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js'
 ];
 
-/* Install: cache satu per satu pakai allSettled supaya kalau ada 1 URL gagal,
-   install SW tetap sukses (URL itu akan di-fetch online saat dipakai). */
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(
@@ -30,7 +28,6 @@ self.addEventListener('install', e => {
   );
 });
 
-/* Activate: hapus cache versi lama, ambil alih tab yang terbuka. */
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
@@ -39,20 +36,15 @@ self.addEventListener('activate', e => {
   );
 });
 
-/* Fetch: cache-first, lalu network. Response yang valid ikut disimpan (runtime cache). */
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-
-  // version.json HARUS selalu dari network (biar deteksi update akurat)
   if (e.request.url.includes('version.json')) {
     return e.respondWith(fetch(e.request));
   }
-
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        // Simpan ke cache hanya response yang sah (200 & bukan opaque)
         if (res && res.status === 200 && res.type !== 'opaque') {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, clone)).catch(() => {});
