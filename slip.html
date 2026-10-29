@@ -13,28 +13,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
-  /* PERBAIKAN TOTAL UNTUK HTML2PDF */
+  /* PERBAIKAN: Gunakan Fixed dan beri ruang lebar maksimal */
   #pdfRenderHost {
-    position: absolute; /* Gunakan absolute agar stabil */
+    position: fixed;
     top: 0;
     left: 0;
-    z-index: -9999;
-    opacity: 0.01;
+    width: 100%;
+    z-index: 9999;
+    opacity: 0; /* Transparan, tapi tetap ada di DOM */
     pointer-events: none;
-  }
-  
-  /* Kunci lebar PDF agar tidak terpotong di HP */
-  #pdfRenderHost .slip {
-    width: 700px !important; 
     background: #fff;
-    border: none !important;
-    margin: 0;
-    padding: 20px;
+  }
+  #pdfRenderHost .slip {
+    width: 100%;
+    max-width: 800px; /* Lebar maksimal konten */
+    background: #fff;
+    margin: 0 auto;
+    box-sizing: border-box;
   }
   
-  /* Kunci layout tabel */
+  /* Kunci layout tabel agar tidak meluber */
   .slip table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .slip td:first-child { width: 60%; }
+  .slip td:first-child { width: 60%; word-wrap: break-word; }
   .slip td:last-child { width: 40%; text-align: right; white-space: nowrap; }
 
   /* CSS Modal Import */
@@ -528,15 +528,15 @@ async function saveSlipPDF(w) {
   const host = $('pdfRenderHost');
   host.innerHTML = slipHTML(w);
   
-  // Tunggu DOM dirender
-  await new Promise(r => setTimeout(r, 250));
+  // Tunggu DOM benar-benar selesai dirender
+  await new Promise(r => setTimeout(r, 300));
   
   const el = host.querySelector('.slip');
   const safeName = String(w.n).replace(/[\\/:*?"<>|]+/g, '');
   
   try {
     await html2pdf().set({
-      margin: 10,
+      margin: 15, // Margin diperbesar sedikit agar rapi
       filename: `Slip Gaji - ${safeName}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
@@ -544,12 +544,11 @@ async function saveSlipPDF(w) {
         useCORS: true, 
         backgroundColor: '#ffffff',
         logging: false,
-        x: 0,       // Paksa mulai dari kiri atas
-        y: 0,
-        scrollX: 0, // Abaikan scroll layar
+        scrollX: 0, 
         scrollY: 0,
-        windowWidth: 800, // Lebar virtual
-        windowHeight: el.offsetHeight + 100
+        windowWidth: 1000, // Paksa lebar virtual yang besar
+        width: el.offsetWidth, // Ambil lebar asli elemen
+        height: el.offsetHeight // Ambil tinggi asli elemen
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
