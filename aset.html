@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#8f1d21">
+<link rel="manifest" href="manifest.json">
+<title>Data Aset AWB</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+  .chips { display:flex; gap:6px; overflow-x:auto; padding-bottom:6px; margin-bottom:8px; }
+  .chip { flex:none; padding:7px 13px; border-radius:20px; border:1px solid var(--line); background:#fff; font:600 13px Figtree,sans-serif; color:var(--mute); cursor:pointer; }
+  .chip.on { background:var(--wine); border-color:var(--wine); color:#fff; }
+  .filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:10px; font-size:11px; font-weight:600; }
+  .p-baik { background:#e8f4ea; color:#3d6b41; }
+  .p-rusak { background:#fde8e4; color:#a33; }
+  .p-lain { background:#fff3d6; color:#8a6a10; }
+  .p-disp { background:#eee; color:#666; }
+  .item { padding:12px; margin-bottom:8px; cursor:pointer; }
+  .item:active { background:#fdf6f0; }
+  .item .nm { font-weight:600; font-size:15px; }
+  .item .kd { font-size:11px; color:var(--mute); letter-spacing:.02em; }
+  .item .meta { font-size:12px; color:var(--mute); margin-top:4px; }
+  table.rk { width:100%; border-collapse:collapse; font-size:13px; }
+  table.rk th { text-align:left; font-size:11px; color:var(--mute); font-weight:600; padding:4px 0; border-bottom:1px solid var(--line); }
+  table.rk td { padding:7px 0; border-bottom:1px dashed var(--line); }
+  table.rk th:not(:first-child), table.rk td:not(:first-child) { text-align:right; }
+  .fab { position:fixed; right:16px; bottom:84px; width:54px; height:54px; border-radius:50%; border:0; background:var(--wine); color:#fff; font-size:28px; box-shadow:0 4px 12px rgba(0,0,0,.3); z-index:50; }
+  #modal { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:10000; display:none; align-items:flex-end; justify-content:center; }
+  .sheet { background:#fff; width:100%; max-width:640px; max-height:92vh; border-radius:16px 16px 0 0; display:flex; flex-direction:column; }
+  .sheet-h { padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+  .sheet-b { padding:14px 16px; overflow-y:auto; flex:1; }
+  .sheet-f { padding:12px 16px; border-top:1px solid var(--line); display:flex; gap:8px; }
+  .sheet label { display:block; font-size:11px; color:var(--mute); margin:10px 0 3px; }
+  .sheet-b .grid label:first-child { margin-top:0; }
+  .btn { padding:12px; border-radius:10px; font:600 14px Figtree,sans-serif; border:1px solid var(--wine); background:none; color:var(--wine); cursor:pointer; }
+  .btn.pri { background:var(--wine); color:#fff; }
+  .btn.dgr { border-color:#a33; color:#a33; }
+  textarea.ls { width:100%; min-height:110px; padding:10px; border:1px solid var(--line); border-radius:8px; font:13px/1.5 Figtree,monospace; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hbtns" style="left:12px; right:auto;">
+    <button onclick="location.href='./index.html'">← Menu</button>
+  </div>
+  <div class="hbtns">
+    <button onclick="loadData(true)">⟳ Muat</button>
+  </div>
+  <h1>Data Aset</h1>
+  <div class="couple">PT. Agriwangi Berry</div>
+  <div style="margin-top:8px"><span id="cn" class="badge">⚪ Belum terhubung</span></div>
+</header>
+
+<div id="st"></div>
+<main id="m"></main>
+
+<button class="fab" id="fab" onclick="openForm(null)" title="Tambah aset">+</button>
+
+<nav>
+  <button onclick="switchTab('ringkas')" id="nav-ringkas" class="on"><div class="ic">📊</div>Ringkasan</button>
+  <button onclick="switchTab('daftar')" id="nav-daftar"><div class="ic">📋</div>Daftar</button>
+  <button onclick="switchTab('setting')" id="nav-setting"><div class="ic">⚙️</div>Pengaturan</button>
+</nav>
+
+<div id="modal"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const LS_URL = 'aset_url', LS_PIN = 'aset_pin', LS_CACHE = 'aset_cache_v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const todayISO = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); };
+const MON = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const fmtD = s => { const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? (+m[3]) + ' ' + MON[+m[2]-1] + ' ' + m[1] : '-'; };
+
+let items = [], cfg = { lokasi:[], kategori:[], kondisi:[], satuan:[], kelompok:[] };
+let tab = 'ringkas';
+let F = { kel:'', lok:'', kon:'', sts:'aktif', q:'' };
+let editing = null; // {row, kode, lokasi} saat edit
+
+function toast(t) {
+  const e = $('st'); e.textContent = t; e.style.display = 'block';
+  clearTimeout(window._tt); window._tt = setTimeout(() => e.style.display = 'none', 2600);
+}
+function setBadge(txt) { $('cn').textContent = txt; }
+
+/* ---------- API ---------- */
+async function api(action, data = {}) {
+  const url = localStorage.getItem(LS_URL), pin = localStorage.getItem(LS_PIN);
+  if (!url || !pin) throw new Error('URL & PIN belum diisi (tab Pengaturan).');
+  const r = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ action, pin, ...data }) });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Gagal');
+  return j;
+}
+
+async function loadData(manual) {
+  const cache = JSON.parse(localStorage.getItem(LS_CACHE) || 'null');
+  if (cache && !items.length) { items = cache.items; cfg = cache.config; setBadge('🟡 Data tersimpan di HP'); draw(); }
+  if (!localStorage.getItem(LS_URL)) { setBadge('⚪ Belum terhubung'); if (manual) toast('Isi URL Apps Script dulu'); return; }
+  setBadge('⏳ Memuat…');
+  try {
+    const j = await api('list');
+    items = j.items; cfg = j.config;
+    localStorage.setItem(LS_CACHE, JSON.stringify({ items, config: cfg }));
+    setBadge('🟢 Terhubung ke Google Sheet');
+    if (manual) toast('Data dimuat: ' + items.length + ' aset');
+  } catch (e) {
+    setBadge(cache ? '🟡 Offline (data terakhir)' : '🔴 Gagal terhubung');
+    toast(e.message);
+  }
+  draw();
+}
+
+/* ---------- Helper data ---------- */
+const kelompokOf = it => it.kelompok || (cfg.lokasi.find(l => l.n.toLowerCase() === (it.lokasi||'').toLowerCase()) || {}).g || 'Kantor';
+const aktif = it => !it.tglDisposal;
+const kondCls = it => it.tglDisposal ? 'p-disp' : /rusak/i.test(it.kondisi) ? 'p-rusak' : /baik/i.test(it.kondisi) ? 'p-baik' : 'p-lain';
+const kondTxt = it => it.tglDisposal ? 'Disposal' : (it.kondisi || '-');
+const kelompokList = () => (cfg.kelompok && cfg.kelompok.length) ? cfg.kelompok : ['Kebun','Kantor'];
+
+/* ---------- Render ---------- */
+function switchTab(t) {
+  tab = t;
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
+  $('nav-' + t).classList.add('on');
+  $('fab').style.display = t === 'setting' ? 'none' : 'block';
+  draw(); window.scrollTo(0, 0);
+}
+function draw() { ({ ringkas: drawRingkas, daftar: drawDaftar, setting: drawSetting })[tab](); }
+
+function drawRingkas() {
+  const act = items.filter(aktif);
+  const unit = act.reduce((a, i) => a + (Number(i.qty) || 0), 0);
+  const rusak = act.filter(i => /rusak/i.test(i.kondisi)).length;
+  let h = `
+    <div class="grid" style="margin-bottom:12px">
+      <div class="card"><div class="mute">Jenis Aset Aktif</div><div class="num" style="font-size:22px;color:var(--wine)">${act.length}</div></div>
+      <div class="card"><div class="mute">Total Unit</div><div class="num" style="font-size:22px">${unit}</div></div>
+      <div class="card"><div class="mute">Kondisi Rusak</div><div class="num" style="font-size:22px;color:#a33">${rusak}</div></div>
+      <div class="card"><div class="mute">Sudah Disposal</div><div class="num" style="font-size:22px;color:var(--mute)">${items.length - act.length}</div></div>
+    </div>`;
+  if (!items.length) h += `<div class="card mute" style="text-align:center">Belum ada data. Hubungkan ke Google Sheet di tab Pengaturan.</div>`;
+  kelompokList().forEach(k => {
+    const grp = act.filter(i => kelompokOf(i) === k);
+    if (!grp.length) return;
+    const lokSet = [...new Set(grp.map(i => i.lokasi || '(tanpa lokasi)'))];
+    let rows = lokSet.map(l => {
+      const g = grp.filter(i => (i.lokasi || '(tanpa lokasi)') === l);
+      const rs = g.filter(i => /rusak/i.test(i.kondisi)).length;
+      return `<tr onclick="goFilter('${esc(k)}','${esc(l)}')" style="cursor:pointer"><td>${esc(l)}</td><td>${g.length}</td><td>${g.reduce((a,i)=>a+(Number(i.qty)||0),0)}</td><td style="color:${rs?'#a33':'inherit'}">${rs||'-'}</td></tr>`;
+    }).join('');
+    h += `<div class="card"><b style="font-family:Fraunces,serif;color:var(--wine)">Aset ${esc(k)}</b> <span class="mute">· ${grp.length} jenis</span>
+      <table class="rk" style="margin-top:8px"><tr><th>Lokasi</th><th>Jenis</th><th>Unit</th><th>Rusak</th></tr>${rows}</table></div>`;
+  });
+  $('m').innerHTML = h;
+}
+
+function goFilter(k, l) { F.kel = k; F.lok = l; F.sts = 'aktif'; switchTab('daftar'); }
+
+function drawDaftar() {
+  const q = F.q.toLowerCase();
+  const list = items.filter(i => {
+    if (F.kel && kelompokOf(i) !== F.kel) return false;
+    if (F.lok && i.lokasi !== F.lok) return false;
+    if (F.kon && i.kondisi !== F.kon) return false;
+    if (F.sts === 'aktif' && !aktif(i)) return false;
+    if (F.sts === 'disposal' && aktif(i)) return false;
+    if (q && ![i.nama, i.kode, i.merek, i.pic, i.kategori, i.lokasi].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const lokOpts = [...new Set([...cfg.lokasi.map(l => l.n), ...items.map(i => i.lokasi)].filter(Boolean))];
+  const konOpts = [...new Set([...cfg.kondisi, ...items.map(i => i.kondisi)].filter(Boolean))];
+  const opt = (arr, sel, all) => `<option value="">${all}</option>` + arr.map(x => `<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+
+  let h = `
+    <div class="chips">
+      <button class="chip ${!F.kel?'on':''}" onclick="setF('kel','')">Semua</button>
+      ${kelompokList().map(k => `<button class="chip ${F.kel===k?'on':''}" onclick="setF('kel','${esc(k)}')">${esc(k)}</button>`).join('')}
+    </div>
+    <input type="search" id="q" placeholder="Cari nama, kode, PIC…" value="${esc(F.q)}" oninput="F.q=this.value; clearTimeout(window._qt); window._qt=setTimeout(()=>{drawDaftar(); const e=$('q'); e.focus(); e.setSelectionRange(e.value.length,e.value.length);},250)" style="width:100%;margin-bottom:8px">
+    <div class="filters">
+      <select onchange="setF('lok',this.value)">${opt(lokOpts, F.lok, 'Semua lokasi')}</select>
+      <select onchange="setF('kon',this.value)">${opt(konOpts, F.kon, 'Semua kondisi')}</select>
+    </div>
+    <div class="filters" style="grid-template-columns:1fr auto;align-items:center">
+      <select onchange="setF('sts',this.value)">
+        <option value="aktif" ${F.sts==='aktif'?'selected':''}>Hanya aktif</option>
+        <option value="disposal" ${F.sts==='disposal'?'selected':''}>Sudah disposal</option>
+        <option value="semua" ${F.sts==='semua'?'selected':''}>Semua</option>
+      </select>
+      <span class="mute">${list.length} aset</span>
+    </div>`;
+  if (!list.length) h += `<div class="card mute" style="text-align:center">Tidak ada aset yang cocok.</div>`;
+  h += list.map(i => `
+    <div class="card item" onclick="openForm(${items.indexOf(i)})">
+      <div class="row" style="align-items:flex-start">
+        <div>
+          <div class="nm">${esc(i.nama)}${i.merek ? ' <span class="mute">· ' + esc(i.merek) + '</span>' : ''}</div>
+          <div class="kd">${esc(i.kode)}</div>
+        </div>
+        <span class="pill ${kondCls(i)}">${esc(kondTxt(i))}</span>
+      </div>
+      <div class="meta">📍 ${esc(i.lokasi || '-')} · 👤 ${esc(i.pic || '-')} · ${esc(i.qty === '' ? '-' : i.qty)} ${esc(i.satuan)} · ${esc(kelompokOf(i))}</div>
+    </div>`).join('');
+  $('m').innerHTML = h;
+}
+function setF(k, v) { F[k] = v; drawDaftar(); }
+
+function drawSetting() {
+  const lines = (arr, fn) => arr.map(fn).join('\n');
+  $('m').innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 10px;font-family:Fraunces,serif;color:var(--wine)">Koneksi Google Sheet</h3>
+      <label class="mute">URL Web App (Apps Script, berakhiran /exec)</label>
+      <input type="text" id="s-url" value="${esc(localStorage.getItem(LS_URL) || '')}" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%">
+      <label class="mute" style="margin-top:10px;display:block">PIN</label>
+      <input type="text" id="s-pin" value="${esc(localStorage.getItem(LS_PIN) || '')}" placeholder="PIN dari Script Properties" style="width:100%">
+      <button class="btn pri" style="width:100%;margin-top:14px" onclick="saveConn()">Simpan & Tes Koneksi</button>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 4px;font-family:Fraunces,serif;color:var(--wine)">Daftar Pilihan</h3>
+      <p class="mute" style="margin:0 0 6px">Satu baris satu item. Lokasi baru (misal GH 3) cukup ditambah di sini.</p>
+      <label class="mute">Lokasi — format: Nama | Kelompok | Kode</label>
+      <textarea class="ls" id="c-lok">${esc(lines(cfg.lokasi, l => [l.n, l.g, l.c].join(' | ').replace(/( \| )+$/,'')))}</textarea>
+      <label class="mute" style="margin-top:8px;display:block">Kategori — format: Nama | Kode</label>
+      <textarea class="ls" id="c-kat">${esc(lines(cfg.kategori, k => [k.n, k.c].join(' | ').replace(/( \| )+$/,'')))}</textarea>
+      <label class="mute" style="margin-top:8px;display:block">Kondisi</label>
+      <textarea class="ls" id="c-kon" style="min-height:70px">${esc(cfg.kondisi.join('\n'))}</textarea>
+      <label class="mute" style="margin-top:8px;display:block">Satuan</label>
+      <textarea class="ls" id="c-sat" style="min-height:70px">${esc(cfg.satuan.join('\n'))}</textarea>
+      <label class="mute" style="margin-top:8px;display:block">Kelompok</label>
+      <textarea class="ls" id="c-kel" style="min-height:60px">${esc(kelompokList().join('\n'))}</textarea>
+      <button class="btn pri" style="width:100%;margin-top:14px" onclick="saveCfg()">Simpan Daftar ke Sheet</button>
+    </div>`;
+}
+
+async function saveConn() {
+  let u = $('s-url').value.trim();
+  localStorage.setItem(LS_URL, u);
+  localStorage.setItem(LS_PIN, $('s-pin').value.trim());
+  await loadData(true);
+}
+
+async function saveCfg() {
+  const L = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
+  const P = id => L(id).map(s => s.split('|').map(x => x.trim()));
+  const c = {
+    lokasi: P('c-lok').map(r => ({ n: r[0], g: r[1] || '', c: r[2] || '' })),
+    kategori: P('c-kat').map(r => ({ n: r[0], c: r[1] || '' })),
+    kondisi: L('c-kon'), satuan: L('c-sat'), kelompok: L('c-kel')
+  };
+  try { await api('saveConfig', { config: c }); toast('Daftar disimpan'); await loadData(); switchTab('setting'); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- Form tambah / edit ---------- */
+function sel(id, arr, cur, blank) {
+  const all = [...new Set([...arr, ...(cur && !arr.includes(cur) ? [cur] : [])])];
+  return `<select id="${id}">${blank ? '<option value="">—</option>' : ''}${all.map(x => `<option ${x===cur?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+}
+
+function openForm(idx) {
+  const it = idx === null ? { kode:'', nama:'', merek:'', kategori:'', lokasi: F.lok || '', pic:'', kondisi: cfg.kondisi[0] || 'Baik', qty:1, satuan: cfg.satuan[0] || 'Buah', tglBeli: todayISO(), tglMutasi:'', tglDisposal:'', kelompok: F.kel || '', catatan:'' } : items[idx];
+  editing = idx === null ? null : { row: it.row, kode: it.kode, lokasi: it.lokasi };
+  const pics = [...new Set(items.map(i => i.pic).filter(Boolean))];
+  $('sheet').innerHTML = `
+    <div class="sheet-h"><b>${editing ? 'Edit Aset' : 'Tambah Aset'}</b><button onclick="closeForm()" style="background:none;border:0;font-size:26px;cursor:pointer">&times;</button></div>
+    <div class="sheet-b">
+      <label>Nama Aset *</label><input type="text" id="f-nama" value="${esc(it.nama)}" style="width:100%" ${editing ? '' : 'oninput="autoKode()"'}>
+      <div class="grid">
+        <div><label>Kategori</label>${sel('f-kat', cfg.kategori.map(k => k.n), it.kategori, true).replace('<select', '<select onchange="autoKode()"')}</div>
+        <div><label>Merek / Warna</label><input type="text" id="f-merek" value="${esc(it.merek)}"></div>
+        <div><label>Lokasi</label>${sel('f-lok', cfg.lokasi.map(l => l.n), it.lokasi, true).replace('<select', '<select onchange="onLok()"')}</div>
+        <div><label>Kelompok</label>${sel('f-kel', kelompokList(), it.kelompok || (it.lokasi ? kelompokOf(it) : ''), true)}</div>
+        <div><label>PIC</label><input type="text" id="f-pic" list="pics" value="${esc(it.pic)}"><datalist id="pics">${pics.map(p => `<option value="${esc(p)}">`).join('')}</datalist></div>
+        <div><label>Kondisi</label>${sel('f-kon', cfg.kondisi, it.kondisi, false)}</div>
+        <div><label>Qty</label><input type="number" id="f-qty" value="${esc(it.qty)}" min="0"></div>
+        <div><label>Satuan</label>${sel('f-sat', cfg.satuan, it.satuan, false)}</div>
+        <div><label>Tgl Pembelian</label><input type="date" id="f-beli" value="${esc(it.tglBeli)}" ${editing ? '' : 'onchange="autoKode()"'}></div>
+        <div><label>Tgl Mutasi</label><input type="date" id="f-mut" value="${esc(it.tglMutasi)}"></div>
+      </div>
+      <label>Tgl Disposal (isi bila aset sudah tidak dipakai/dibuang)</label>
+      <div style="display:flex;gap:6px"><input type="date" id="f-disp" value="${esc(it.tglDisposal)}" style="flex:1"><button class="btn" style="padding:8px 12px" onclick="$('f-disp').value=todayISO()">Hari ini</button></div>
+      <label>Kode Aset *</label>
+      <div style="display:flex;gap:6px"><input type="text" id="f-kode" value="${esc(it.kode)}" style="flex:1"><button class="btn" style="padding:8px 12px" onclick="autoKode(true)">Otomatis</button></div>
+      <label>Catatan</label><input type="text" id="f-cat" value="${esc(it.catatan)}" style="width:100%">
+    </div>
+    <div class="sheet-f">
+      ${editing ? '<button class="btn dgr" onclick="delItem()">Hapus</button>' : ''}
+      <button class="btn pri" style="flex:1" id="f-save" onclick="saveItem()">Simpan ke Sheet</button>
+    </div>`;
+  $('modal').style.display = 'flex';
+  if (!editing) autoKode();
+}
+function closeForm() { $('modal').style.display = 'none'; }
+
+function onLok() {
+  const l = cfg.lokasi.find(x => x.n === $('f-lok').value);
+  if (l && l.g) $('f-kel').value = l.g;
+  autoKode();
+}
+
+// Kode otomatis: HR-{tahun}-{nama 3 huruf}-{kode kategori}-{kode lokasi}-{urut}. Tetap bisa diedit manual.
+function autoKode(force) {
+  if (editing && !force) return;
+  const kodeEl = $('f-kode');
+  if (!force && kodeEl.dataset.manual === '1') return;
+  const nama = $('f-nama').value.toUpperCase().replace(/[^A-Z0-9 ]/g, '');
+  if (!nama.trim()) return;
+  const first = nama.trim().split(' ')[0];
+  const cons = first.replace(/[AIUEO]/g, '');
+  const nm = ((first[0] || '') + cons.slice(first[0] && !/[AIUEO]/.test(first[0]) ? 1 : 0)).slice(0, 3).padEnd(3, 'X');
+  const yr = ($('f-beli').value || todayISO()).slice(0, 4);
+  const kat = cfg.kategori.find(k => k.n === $('f-kat').value);
+  const lok = cfg.lokasi.find(l => l.n === $('f-lok').value);
+  const ini = s => s.split(/[^A-Za-z0-9]+/).filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 3);
+  const kc = (kat && kat.c) || (kat ? ini(kat.n) : 'XXX');
+  const lc = (lok && lok.c) || (lok ? ini(lok.n) : 'XXX');
+  const pre = ['HR', yr, nm, kc, lc].join('-');
+  const n = items.filter(i => i.kode.startsWith(pre + '-')).length + 1;
+  kodeEl.value = pre + '-' + String(n).padStart(2, '0');
+}
+
+async function saveItem() {
+  const g = id => $(id).value.trim();
+  const it = {
+    kode: g('f-kode'), nama: g('f-nama'), kategori: g('f-kat'), merek: g('f-merek'),
+    lokasi: g('f-lok'), pic: g('f-pic'), kondisi: g('f-kon'),
+    qty: g('f-qty'), satuan: g('f-sat'),
+    tglBeli: g('f-beli'), tglMutasi: g('f-mut'), tglDisposal: g('f-disp'),
+    kelompok: g('f-kel'), catatan: g('f-cat')
+  };
+  if (!it.nama) return alert('Nama aset wajib diisi.');
+  if (!it.kode) return alert('Kode aset wajib diisi.');
+  if (editing && editing.lokasi !== it.lokasi && !it.tglMutasi) it.tglMutasi = todayISO(); // lokasi berpindah = mutasi
+  const btn = $('f-save'); btn.disabled = true; btn.textContent = 'Menyimpan…';
+  try {
+    await api('save', { item: it, row: editing ? editing.row : null, oldKode: editing ? editing.kode : '' });
+    closeForm(); toast('Tersimpan di Google Sheet'); await loadData();
+  } catch (e) { alert(e.message); btn.disabled = false; btn.textContent = 'Simpan ke Sheet'; }
+}
+
+async function delItem() {
+  if (!editing) return;
+  if (!confirm('Hapus baris aset ini dari Google Sheet? Kalau hanya sudah tidak dipakai, lebih baik isi Tgl Disposal.')) return;
+  try { await api('delete', { row: editing.row, oldKode: editing.kode }); closeForm(); toast('Aset dihapus'); await loadData(); }
+  catch (e) { alert(e.message); }
+}
+
+document.addEventListener('input', e => { if (e.target.id === 'f-kode') e.target.dataset.manual = '1'; });
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeForm(); });
+
+switchTab('ringkas');
+loadData();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+</script>
+</body>
+</html>

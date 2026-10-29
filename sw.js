@@ -1,9 +1,10 @@
-const CACHE_NAME = 'awb-apps-v14'; // Ubah ke v10
+const CACHE_NAME = 'awb-apps-v14';
 const urlsToCache = [
   './',
   './index.html',
   './slip.html',
   './stok.html',
+  './aset.html',
   './style.css',
   './manifest.json',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
