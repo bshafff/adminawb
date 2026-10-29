@@ -13,29 +13,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
-  /* PERBAIKAN: Gunakan Fixed dan beri ruang lebar maksimal */
+  /* Host render PDF: lebar tetap (px) dan menempel di kiri atas agar tidak terpotong */
   #pdfRenderHost {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    z-index: 9999;
-    opacity: 0; /* Transparan, tapi tetap ada di DOM */
+    width: 720px;
+    z-index: -1;
     pointer-events: none;
     background: #fff;
   }
   #pdfRenderHost .slip {
-    width: 100%;
-    max-width: 800px; /* Lebar maksimal konten */
+    width: 720px;
+    margin: 0;
+    padding: 24px 28px 20px;
+    border: none;
+    border-radius: 0;
     background: #fff;
-    margin: 0 auto;
     box-sizing: border-box;
   }
-  
+  #pdfRenderHost .slip td { font-size: 14px; }
+
   /* Kunci layout tabel agar tidak meluber */
   .slip table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-  .slip td:first-child { width: 60%; word-wrap: break-word; }
-  .slip td:last-child { width: 40%; text-align: right; white-space: nowrap; }
+  .slip td:first-child { width: 58%; word-wrap: break-word; }
+  .slip td:last-child { width: 42%; text-align: right; white-space: nowrap; }
 
   /* CSS Modal Import */
   #import-modal {
@@ -516,7 +518,7 @@ function slipHTML(w) {
     </table>
     <div class="ttd">
       <div class="lbl">Tanda Terima,</div>
-      <div class="line">(__________________)</div>
+      <div class="line">( ${esc(w.n)} )</div>
     </div>
   </div>`;
 }
@@ -529,29 +531,30 @@ async function saveSlipPDF(w) {
   host.innerHTML = slipHTML(w);
   
   // Tunggu DOM benar-benar selesai dirender
-  await new Promise(r => setTimeout(r, 300));
+  window.scrollTo(0, 0);
+  await new Promise(r => setTimeout(r, 400));
   
   const el = host.querySelector('.slip');
   const safeName = String(w.n).replace(/[\\/:*?"<>|]+/g, '');
   
   try {
     await html2pdf().set({
-      margin: 15, // Margin diperbesar sedikit agar rapi
+      margin: [12, 10, 12, 10],
       filename: `Slip Gaji - ${safeName}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
-        scrollX: 0, 
-        scrollY: 0,
-        windowWidth: 1000, // Paksa lebar virtual yang besar
-        width: el.offsetWidth, // Ambil lebar asli elemen
-        height: el.offsetHeight // Ambil tinggi asli elemen
+        x: 0, y: 0,
+        scrollX: 0, scrollY: 0,
+        windowWidth: 720,
+        width: 720,
+        height: el.scrollHeight
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      pagebreak: { mode: ['avoid-all'] }
     }).from(el).save();
   } catch (err) {
     console.error(err);
