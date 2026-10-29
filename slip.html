@@ -13,10 +13,24 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
+  /* PERBAIKAN CSS UNTUK RENDER PDF */
   #pdfRenderHost {
-    position: fixed; top: 0; left: 0; width: 100%; max-width: 600px; 
-    background: #fff; z-index: -9999; opacity: 0; pointer-events: none;
+    position: absolute;
+    top: 0;
+    left: -9999px; /* Sembunyikan di luar layar kiri */
+    width: 800px;  /* Lebar tetap agar konsisten */
+    background: #fff;
   }
+  
+  /* Kunci Layout Tabel agar tidak berantakan */
+  .slip table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    table-layout: fixed; 
+  }
+  .slip td:first-child { width: 60%; }
+  .slip td:last-child { width: 40%; text-align: right; }
+
   /* CSS Modal Import */
   #import-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.6); 
@@ -79,9 +93,7 @@
       <b>Pilih Pekerja yang Di-import</b>
       <button onclick="document.getElementById('import-modal').style.display='none'" style="background:none; border:0; font-size:24px; cursor:pointer;">&times;</button>
     </div>
-    <div class="import-body" id="import-list">
-      <!-- Checkbox dirender via JS -->
-    </div>
+    <div class="import-body" id="import-list"></div>
     <div class="import-footer">
       <button onclick="document.getElementById('import-modal').style.display='none'" style="flex:1; padding:12px; border:1px solid var(--line); background:#eee; border-radius:10px; font-weight:600;">Batal</button>
       <button onclick="confirmImport()" style="flex:2; padding:12px; border:0; background:var(--wine); color:#fff; border-radius:10px; font-weight:600;">Import Terpilih</button>
@@ -96,7 +108,7 @@ const COMPANY = 'PT. AGRI WANGI BERRY';
 const STORE = 'slip-upah-pwa-v1';
 let currentTab = 'home';
 let workers = [];
-let parsedWorkers = []; // Menyimpan hasil sementara sebelum di-import
+let parsedWorkers = [];
 
 const DEFAULT_WORKERS = [
   {n:'Agyl Agniya', i:'54401100323506', k:'Grower GH 1', h:'26', j:'7', m:'0', r:'0', p:'0', a:'', b:'', c:''}
@@ -282,26 +294,23 @@ async function handleExcelUpload(e) {
       rows.forEach(row => {
         if (!row || row.length === 0) return;
         const rowStr = row.map(c => String(c || '').trim().toUpperCase());
-        const bCell = String(row[1] || '').trim(); // Kolom B biasanya berisi "Summary" atau "Upah ..."
+        const bCell = String(row[1] || '').trim();
 
-        // 1. DETEKSI SUMMARY (Hanya jika kolom B isinya "SUMMARY")
         if (bCell.toUpperCase() === 'SUMMARY') {
            isStopped = true;
            colMap = null;
            return;
         }
 
-        // 2. DETEKSI JUDUL KATEGORI BARU
         if (bCell.toLowerCase().startsWith('upah ')) {
           currentCategory = bCell.substring(5).trim();
-          isStopped = false; // Buka blokir jika ada tabel baru di bawahnya
+          isStopped = false; 
           colMap = null;
           return;
         }
 
         if (isStopped) return;
 
-        // 3. DETEKSI HEADER TABEL
         const isHeader = rowStr.includes('NAMA') && rowStr.some(c => c.includes('KEHADIRAN'));
         if (isHeader) {
           colMap = {
@@ -315,17 +324,14 @@ async function handleExcelUpload(e) {
           return;
         }
 
-        // 4. EKSTRAK DATA
         if (colMap && colMap.n !== -1) {
           const name = String(row[colMap.n] || '').trim();
           
           if (!name || name.toUpperCase() === 'NAMA' || name.toUpperCase() === 'NO' || name.toLowerCase().includes('total')) return;
 
           let rawH = String(row[colMap.h] || '').trim();
-          // Validasi: Hadir tidak boleh mengandung "Rp" atau koma (harus angka murni)
           if (rawH.includes('Rp') || rawH.includes(',')) return;
 
-          // Parsing Lembur (8.34 -> 8 Jam 34 Menit)
           let j = 0, m = 0;
           if (colMap.j !== -1) {
             const rawJ = String(row[colMap.j] || '').replace(',', '.').trim();
@@ -343,7 +349,6 @@ async function handleExcelUpload(e) {
             }
           }
 
-          // Ambil sisa data
           const rek = colMap.i !== -1 ? String(row[colMap.i] || '').trim() : '';
           const merah = colMap.r !== -1 ? String(row[colMap.r] || '').replace(/[^0-9]/g, '') : '0';
           
@@ -378,12 +383,10 @@ async function handleExcelUpload(e) {
   reader.readAsArrayBuffer(file);
 }
 
-// ===== TAMPILKAN MODAL CHECKLIST =====
 function showImportChecklist(sheetName) {
   const list = $('import-list');
   list.innerHTML = '';
 
-  // Kata kunci yang otomatis di-uncheck (karena ini bukan nama orang)
   const ignoreWords = ['grower gh 1', 'grower gh 2', 'grower gh 1', 'processing', 'satpam', 'house keeping', 'housekeeping', 'grower fertigasi'];
 
   parsedWorkers.forEach((w, i) => {
@@ -405,7 +408,6 @@ function showImportChecklist(sheetName) {
   document.querySelector('.import-header b').textContent = `Pilih Pekerja (Sheet: ${sheetName})`;
   $('import-modal').style.display = 'flex';
   
-  // Set tombol jadi dinamis
   const btn = document.querySelector('.import-footer button[onclick="confirmImport()"]');
   updateImportCount(btn);
 }
@@ -532,8 +534,13 @@ async function saveSlipPDF(w) {
       filename: `Slip Gaji - ${safeName}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { 
-        scale: 2, useCORS: true, backgroundColor: '#ffffff',
-        scrollX: 0, scrollY: 0, windowWidth: 600, windowHeight: el.offsetHeight + 80 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 800, 
+        windowHeight: el.offsetHeight + 100
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
