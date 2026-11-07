@@ -369,7 +369,7 @@ async function makeWord(){
             WidthType, AlignmentType, BorderStyle, PageBreak } = d;
 
     // Lebar/tinggi maks gambar per sel (dalam px Word)
-    const MAXW = 330, MAXH = 390;
+    const MAXW = 360, MAXH = 490;
 
     const NB = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
     const NO_BORDER = { top: NB, bottom: NB, left: NB, right: NB, insideHorizontal: NB, insideVertical: NB };
@@ -398,7 +398,7 @@ async function makeWord(){
           const h = Math.max(1, Math.round(im.h * sc));
           cells.push(new TableCell({
             width: { size: 50, type: WidthType.PERCENTAGE },
-            margins: { top: 80, bottom: 80, left: 80, right: 80 },
+            margins: { top: 40, bottom: 40, left: 40, right: 40 },
             children: [ new Paragraph({
               alignment: AlignmentType.CENTER,
               spacing: { before: 0, after: 0 },
@@ -432,7 +432,7 @@ async function makeWord(){
         properties: {
           page: {
             size: { width: 11906, height: 16838 },
-            margin: { top: 567, right: 567, bottom: 567, left: 567 }
+            margin: { top: 400, right: 400, bottom: 400, left: 400 }
           }
         },
         children
